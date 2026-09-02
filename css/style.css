@@ -1,0 +1,77 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: #0a0e1a;
+  color: #e0e0e0;
+  overflow: hidden;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#status-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(58, 74, 106, 0.4);
+  z-index: 10;
+  font-size: 15px;
+}
+
+#status-bar b { color: #ffd700; }
+
+.status-message {
+  margin-left: auto;
+  color: #88aaff;
+  font-weight: 500;
+}
+
+#canvas-container {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+
+#control-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(58, 74, 106, 0.4);
+  z-index: 10;
+  font-size: 14px;
+}
+
+button {
+  background: #2a3a5a;
+  color: #e0e0e0;
+  border: 1px solid #3a4a6a;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover { background: #3a4a6a; }
+
+label { display: flex; align-items: center; gap: 6px; color: #aabbcc; }
+
+select {
+  background: #2a3a5a;
+  color: #e0e0e0;
+  border: 1px solid #3a4a6a;
+  padding: 6px 8px;
+  border-radius: 4px;
+}

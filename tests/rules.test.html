@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>规则测试</title>
+</head>
+<body>
+  <h1>规则引擎测试</h1>
+  <pre id="output"></pre>
+  <script type="module">
+    import { generateIcosphere } from '../js/mesh/icosphere.js';
+    import { validateMesh } from '../js/mesh/validate.js';
+    import { Board } from '../js/game/board.js';
+    import { checkWin, isDraw, BLACK, WHITE } from '../js/game/rules.js';
+
+    const out = document.getElementById('output');
+    let pass = 0, fail = 0;
+    const results = [];
+
+    function assert(cond, msg) {
+      if (cond) { pass++; results.push('✓ ' + msg); }
+      else { fail++; results.push('✗ ' + msg); }
+    }
+
+    // 构造棋盘
+    const mesh = generateIcosphere(5);
+    validateMesh(mesh);
+    const board = new Board(mesh);
+
+    // 测试 1：手动铺一条 6 价点轴上的 5 连珠
+    // 取顶点 0 的轴方向，沿轴放 5 颗黑子
+    {
+      const axes = getAxesForTest(mesh, 0);
+      if (axes.length > 0) {
+        const { a, b } = axes[0];
+        // 在轴上从 b 到 a 方向连放 5 颗黑子
+        const line = [b, 0, a];
+        // 需要沿轴延伸，简单起见直接取 b 的邻居中沿轴的点
+        // 这里用 board.place 在一条直线上放 5 颗
+        const pts = extendLineForTest(board, mesh, a, b);
+        let win = false;
+        for (const p of pts) {
+          board.place(p);
+          const r = checkWin(board, p, BLACK);
+          if (r.win) win = true;
+        }
+        assert(win, '六价点轴向 5 连珠应判胜');
+      } else {
+        assert(false, '六价点轴向 5 连珠：找不到轴');
+      }
+    }
+
+    // 测试 2：平局判定——铺满整个棋盘
+    {
+      const b2 = new Board(mesh);
+      let lastPlayer = BLACK;
+      for (let v = 0; v < mesh.positions.length / 3; v++) {
+        const r = b2.place(v);
+        lastPlayer = r.player;
+      }
+      assert(b2.isDraw, '铺满棋盘且无连珠应判和棋');
+    }
+
+    // 测试 3：非连珠不判胜
+    {
+      const b3 = new Board(mesh);
+      // 随意放几颗，不构成连珠
+      b3.place(0);
+      b3.place(1);
+      b3.place(2);
+      b3.place(3);
+      assert(!b3.won, '非连珠局面不应判胜');
+    }
+
+    // 测试 4：五价点连珠
+    {
+      // 找五价点，沿其相邻边放 5 颗
+      const star = mesh.degree5Vertices[0];
+      const b4 = new Board(mesh);
+      // 五价点的 5 个邻居连成一线（五价点规则：相邻边视为一个方向）
+      const neighbors = mesh.adjacency[star];
+      let win = false;
+      b4.place(star);
+      for (const nb of neighbors) {
+        b4.place(nb);
+        const r = checkWin(b4, nb, BLACK);
+        if (r.win) win = true;
+      }
+      assert(win, '五价点 5 连珠应判胜');
+    }
+
+    // 测试 5：悔棋后状态回退
+    {
+      const b5 = new Board(mesh);
+      b5.place(0);
+      b5.place(1);
+      const before = b5.history.length;
+      b5.undo();
+      assert(b5.history.length === before - 1, '悔棋后历史长度减 1');
+      assert(b5.occupied[0] === null, '悔棋后顶点 0 清空');
+      assert(b5.currentPlayer === BLACK, '悔棋后切回黑方');
+    }
+
+    out.textContent = results.join('\n') + `\n\n通过 ${pass}，失败 ${fail}`;
+  </script>
+</body>
+</html>

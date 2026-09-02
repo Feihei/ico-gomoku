@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>球面五子棋</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="status-bar">
+      <span class="status-item">手数：<b id="status-turn">0</b></span>
+      <span class="status-item">执子方：<b id="status-player">黑方</b></span>
+      <span class="status-item mode">模式：<b id="status-mode">PvP</b></span>
+      <span class="status-message" id="status-message">对局开始，黑先</span>
+    </header>
+
+    <div id="canvas-container"></div>
+
+    <footer id="control-bar">
+      <button id="btn-new">新对局</button>
+      <button id="btn-undo">悔棋</button>
+      <label>连珠数：
+        <select id="sel-win-n">
+          <option value="5" selected>5</option>
+          <option value="6">6</option>
+        </select>
+      </label>
+      <label>细分频率：
+        <select id="sel-freq">
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5" selected>5</option>
+          <option value="6">6</option>
+        </select>
+      </label>
+    </footer>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./js/vendor/three.module.js",
+      "three/addons/controls/OrbitControls.js": "./js/vendor/OrbitControls.js"
+    }
+  }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
