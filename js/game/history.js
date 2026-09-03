@@ -1,8 +1,6 @@
 // M5 手数记录：支持悔棋与复盘的历史封装
 // 由 board 持有，这里做复盘/手数查询的辅助接口
 
-import { BLACK, WHITE } from './rules.js';
-
 export class MoveHistory {
   constructor() {
     this.moves = []; // [{v, player, turn}]

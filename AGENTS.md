@@ -74,12 +74,13 @@ spherical-gomoku/
 │       └── raycaster.js    # 拾取：鼠标→最近可落子顶点、悬停预览
 └── tests/
     ├── mesh.test.html      # 浏览器内运行的结构校验页面
-    └── rules.test.html     # 规则单元测试页面
+    ├── rules.test.html     # 规则单元测试页面
+    └── run.mjs             # 无头运行器：node tests/run.mjs（Node 中提取 HTML 页内脚本执行，供 CI/快速验证）
 ```
 
-**依赖引入**：使用 CDN 的 ES Module 方式（`importmap` 引入 `three` 与 `three/addons/`）。**禁止引入 Node 专属 API、打包器或 npm 依赖**——本项目必须在纯静态环境下运行。
+**依赖引入**：ES Module + `importmap`，`three` 与 `OrbitControls` 以本地文件形式存放于 `js/vendor/`（保证离线可玩；如换 CDN 需同步改 `index.html` 的 importmap）。**禁止引入 Node 专属 API、打包器或 npm 依赖**——本项目必须在纯静态环境下运行。
 
-**测试约定**：不引入测试框架，使用极简自写断言（`assert(cond, msg)`），以 HTML 页面承载、控制台输出结果。测试可独立打开运行。
+**测试约定**：不引入测试框架，使用极简自写断言（`assert(cond, msg)`），以 HTML 页面承载、控制台输出结果。测试可独立打开运行；也可用 `node tests/run.mjs` 无头运行同一套断言（Node ≥ 22 对 `.mjs` 原生按 ESM 处理，项目无 `package.json`）。
 
 ## 5. 模块职责与接口约定
 
@@ -155,6 +156,7 @@ checkWin(board, vertexIndex, player) // → { win: boolean, line: number[] | nul
 
 ## 10. 已知设计决策（勿擅自更改）
 
+- 细分算法选定 **§2.1 的"频率格点法"（重心坐标撒点 + 球面投影）**，支持任意 n；已实现，勿改回递归中点细分
 - 落子点为**顶点**而非对偶面心：实现更简单，组合结构等价
 - 连珠判定基于**轴向延伸**而非任意路径：与平面五子棋语义一致
 - 五价点可落子：保留其作为战略要点的游戏性

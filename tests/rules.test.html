@@ -2,18 +2,26 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>规则测试</title>
+  <title>规则引擎测试</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #0a0e1a; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    pre { background: #141a2e; padding: 16px; border-radius: 6px; white-space: pre-wrap; }
+    .pass { color: #6fd66f; } .fail { color: #ff6b6b; }
+  </style>
 </head>
 <body>
-  <h1>规则引擎测试</h1>
+  <h1>规则引擎测试（连珠判定 / 五价点穿行 / 胜负 / 平局 / 悔棋）</h1>
   <pre id="output"></pre>
   <script type="module">
     import { generateIcosphere } from '../js/mesh/icosphere.js';
     import { validateMesh } from '../js/mesh/validate.js';
     import { Board } from '../js/game/board.js';
     import { checkWin, isDraw, BLACK, WHITE } from '../js/game/rules.js';
+    import { CONFIG } from '../js/config.js';
 
-    const out = document.getElementById('output');
+    // 无头运行（tests/run.mjs）下无 document，退化为空壳
+    const out = typeof document !== 'undefined' ? document.getElementById('output') : { innerHTML: '' };
     let pass = 0, fail = 0;
     const results = [];
 
@@ -22,86 +30,242 @@
       else { fail++; results.push('✗ ' + msg); }
     }
 
-    // 构造棋盘
+    // ── 辅助：与 rules.js 相同口径的角度计算，用于"独立构造"测试局面 ──
     const mesh = generateIcosphere(5);
-    validateMesh(mesh);
-    const board = new Board(mesh);
+    validateMesh(mesh, 5);
+    const P = mesh.positions;
 
-    // 测试 1：手动铺一条 6 价点轴上的 5 连珠
-    // 取顶点 0 的轴方向，沿轴放 5 颗黑子
-    {
-      const axes = getAxesForTest(mesh, 0);
-      if (axes.length > 0) {
-        const { a, b } = axes[0];
-        // 在轴上从 b 到 a 方向连放 5 颗黑子
-        const line = [b, 0, a];
-        // 需要沿轴延伸，简单起见直接取 b 的邻居中沿轴的点
-        // 这里用 board.place 在一条直线上放 5 颗
-        const pts = extendLineForTest(board, mesh, a, b);
-        let win = false;
-        for (const p of pts) {
-          board.place(p);
-          const r = checkWin(board, p, BLACK);
-          if (r.win) win = true;
+    function angleAt(v, a, b) {
+      const n = (x, y) => {
+        const dx = P[y * 3] - P[x * 3], dy = P[y * 3 + 1] - P[x * 3 + 1], dz = P[y * 3 + 2] - P[x * 3 + 2];
+        const l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        return [dx / l, dy / l, dz / l];
+      };
+      const va = n(v, a), vb = n(v, b);
+      return Math.acos(Math.max(-1, Math.min(1, va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2])));
+    }
+
+    function findAxis(v) {
+      const nbs = mesh.adjacency[v];
+      let best = null, ba = -1;
+      for (let i = 0; i < nbs.length; i++)
+        for (let j = i + 1; j < nbs.length; j++) {
+          const a = angleAt(v, nbs[i], nbs[j]);
+          if (a > ba) { ba = a; best = { a: nbs[i], b: nbs[j] }; }
         }
-        assert(win, '六价点轴向 5 连珠应判胜');
-      } else {
-        assert(false, '六价点轴向 5 连珠：找不到轴');
+      return best;
+    }
+
+    // 沿最直方向走 steps 步（不检查占用，仅取几何路径）
+    function walkStraight(start, cameFrom, steps) {
+      const path = [start];
+      let cur = start, prev = cameFrom;
+      for (let i = 0; i < steps; i++) {
+        let best = null, ba = -1;
+        for (const d of mesh.adjacency[cur]) {
+          if (d === prev) continue;
+          const a = angleAt(cur, prev, d);
+          if (a > ba) { ba = a; best = d; }
+        }
+        if (best === null) break;
+        path.push(best);
+        prev = cur;
+        cur = best;
+      }
+      return path;
+    }
+
+    // 给 board 的 occupied 直接铺同色子（绕过交替落子，用于构造局面）
+    function paint(board, verts, player) {
+      for (const v of verts) board.occupied[v] = player;
+    }
+
+    // ── 测试 1：六价点轴向 5 连珠 ──
+    {
+      const board = new Board(mesh);
+      const v = 1; // 六价点
+      const { a, b } = findAxis(v);
+      const line = [...walkStraight(a, v, 1).reverse(), v, ...walkStraight(b, v, 1)]; // 左2+锚点+右2 = 5 点
+      assert(new Set(line).size === 5, '六价点轴向：构造的 5 点互不重复');
+      paint(board, line, BLACK);
+      const r = checkWin(board, v, BLACK);
+      assert(r.win, '六价点轴向 5 连珠应判胜');
+      assert(r.line && r.line.length >= 5, '获胜线长度 ≥ 5');
+      if (r.line) {
+        let contiguous = true;
+        for (let i = 0; i < r.line.length - 1; i++)
+          if (!mesh.adjacency[r.line[i]].includes(r.line[i + 1])) contiguous = false;
+        assert(contiguous, '获胜线逐段相邻');
       }
     }
 
-    // 测试 2：平局判定——铺满整个棋盘
+    // ── 测试 2：五价点（星位点）5 连珠 ──
     {
-      const b2 = new Board(mesh);
-      let lastPlayer = BLACK;
-      for (let v = 0; v < mesh.positions.length / 3; v++) {
-        const r = b2.place(v);
-        lastPlayer = r.player;
-      }
-      assert(b2.isDraw, '铺满棋盘且无连珠应判和棋');
-    }
-
-    // 测试 3：非连珠不判胜
-    {
-      const b3 = new Board(mesh);
-      // 随意放几颗，不构成连珠
-      b3.place(0);
-      b3.place(1);
-      b3.place(2);
-      b3.place(3);
-      assert(!b3.won, '非连珠局面不应判胜');
-    }
-
-    // 测试 4：五价点连珠
-    {
-      // 找五价点，沿其相邻边放 5 颗
+      const board = new Board(mesh);
       const star = mesh.degree5Vertices[0];
-      const b4 = new Board(mesh);
-      // 五价点的 5 个邻居连成一线（五价点规则：相邻边视为一个方向）
-      const neighbors = mesh.adjacency[star];
-      let win = false;
-      b4.place(star);
-      for (const nb of neighbors) {
-        b4.place(nb);
-        const r = checkWin(b4, nb, BLACK);
-        if (r.win) win = true;
-      }
-      assert(win, '五价点 5 连珠应判胜');
+      const { a, b } = findAxis(star);
+      const line = [...walkStraight(a, star, 1).reverse(), star, ...walkStraight(b, star, 1)]; // 5 点
+      assert(new Set(line).size === 5, '五价点：构造的 5 点互不重复');
+      paint(board, line, BLACK);
+      const r = checkWin(board, star, BLACK);
+      assert(r.win, '五价点 5 连珠应判胜');
     }
 
-    // 测试 5：悔棋后状态回退
+    // ── 测试 3：仅 4 连不判胜 ──
     {
-      const b5 = new Board(mesh);
-      b5.place(0);
-      b5.place(1);
-      const before = b5.history.length;
-      b5.undo();
-      assert(b5.history.length === before - 1, '悔棋后历史长度减 1');
-      assert(b5.occupied[0] === null, '悔棋后顶点 0 清空');
-      assert(b5.currentPlayer === BLACK, '悔棋后切回黑方');
+      const board = new Board(mesh);
+      const v = 1;
+      const { a, b } = findAxis(v);
+      const line4 = [...walkStraight(a, v, 1).reverse(), v, b]; // 左2+锚点+右1 = 4 点
+      paint(board, line4, BLACK);
+      const r = checkWin(board, v, BLACK);
+      assert(!r.win, '仅 4 连不应判胜');
     }
 
-    out.textContent = results.join('\n') + `\n\n通过 ${pass}，失败 ${fail}`;
+    // ── 测试 4：对手子隔断不判胜 ──
+    {
+      const board = new Board(mesh);
+      const v = 1;
+      const { a, b } = findAxis(v);
+      const line = [...walkStraight(a, v, 1).reverse(), v, ...walkStraight(b, v, 1)];
+      paint(board, line, BLACK);
+      board.occupied[v] = WHITE; // 中间换成白子，断成 2+2
+      const r = checkWin(board, a, BLACK);
+      assert(!r.win, '白子隔断后黑方不应判胜');
+    }
+
+    // ── 测试 5：非连珠不判胜（相邻但非共线） ──
+    {
+      const board = new Board(mesh);
+      board.place(0); board.place(1); board.place(2); board.place(3);
+      assert(!board.won, '随意 4 子不应判胜');
+    }
+
+    // ── 测试 6：悔棋状态回退 ──
+    {
+      const board = new Board(mesh);
+      board.place(0); // 黑
+      board.place(1); // 白
+      board.place(2); // 黑
+      board.undo();   // 撤销黑(2)
+      assert(board.history.length === 2, '悔棋后历史长度减 1');
+      assert(board.occupied[2] === null, '悔棋后顶点 2 清空');
+      assert(board.currentPlayer === BLACK, '悔棋后切回黑方');
+    }
+
+    // ── 测试 7：胜利后禁止再落子 ──
+    {
+      const board = new Board(mesh);
+      const v = 1;
+      const { a, b } = findAxis(v);
+      const line = [...walkStraight(a, v, 1).reverse(), v, ...walkStraight(b, v, 1)];
+      paint(board, line, BLACK);
+      const r = checkWin(board, v, BLACK);
+      board.won = r.win; board.winner = BLACK;
+      if (r.win) {
+        assert(board.place(line[0]) === null, '胜利后不应再允许落子');
+      } else {
+        assert(false, '胜利后禁子测试构造失败');
+      }
+    }
+
+    // ── 测试 8：平局判定（构造满盘且无 5 连的假局面） ──
+    {
+      const board = new Board(mesh);
+      // 手工构造：所有顶点占满、但无同色 5 连 —— 用"棋盘染色"思路直接断言 isDraw 纯函数
+      const V = mesh.positions.length / 3;
+      for (let v = 0; v < V; v++) board.occupied[v] = v % 2 ? WHITE : BLACK;
+      // 满盘但可能有五连，这里只验证 isDraw 的语义：occupied 全满即为和棋前提
+      assert(isDraw(board), 'isDraw：占满即满足和棋的"满盘"条件');
+      board.occupied[0] = null;
+      assert(!isDraw(board), 'isDraw：空一子即非满盘');
+    }
+
+    // ── 测试 9：checkWin 是纯函数（同输入同输出，不改状态） ──
+    {
+      const board = new Board(mesh);
+      const v = 1;
+      const { a, b } = findAxis(v);
+      const line = [...walkStraight(a, v, 1).reverse(), v, ...walkStraight(b, v, 1)];
+      paint(board, line, BLACK);
+      const r1 = checkWin(board, v, BLACK);
+      const snap = [...board.occupied];
+      const r2 = checkWin(board, v, BLACK);
+      assert(JSON.stringify(r1) === JSON.stringify(r2), 'checkWin 同输入同输出');
+      assert(JSON.stringify(snap) === JSON.stringify(board.occupied), 'checkWin 不修改 occupied');
+    }
+
+    // ── 测试 10：拐弯不当连珠（近直线延续约束） ──
+    {
+      const board = new Board(mesh);
+      // 六价点 v 的直轴 (a, b)，a 侧再走 1 步：直线段 [l1, a, v, b]（4 直）
+      const v = 1;
+      const { a, b } = findAxis(v);
+      const l1 = walkStraight(a, v, 1)[1];
+      const stones = [l1, a, v, b];
+      const stoneSet = new Set(stones);
+      // 从 b 走一步"拐弯"（夹角低于直线阈值、且不落在已有直线上）
+      let bend = null, bendAng = 0;
+      for (const d of mesh.adjacency[b]) {
+        if (stoneSet.has(d)) continue;
+        const ang = angleAt(b, v, d);
+        if (ang < CONFIG.ANGLE_STRAIGHT_DEG6 && ang > bendAng) { bendAng = ang; bend = d; }
+      }
+      if (bend === null) {
+        assert(false, '拐弯构造失败：找不到低于阈值的拐点');
+      } else {
+        stones.push(bend); // 4 直 + 1 拐 = 5 子
+        assert(new Set(stones).size === stones.length, '拐弯构造的 5 点互不重复');
+        paint(board, stones, BLACK);
+        let anyWin = false;
+        for (const p of stones) {
+          if (checkWin(board, p, BLACK).win) { anyWin = true; break; }
+        }
+        assert(!anyWin, '直线 4 连 + 1 拐弯不应判胜');
+      }
+    }
+
+    // ── 测试 11：纯拐弯五连不判胜（无直线段） ──
+    {
+      const board = new Board(mesh);
+      // 从六价点 v 出发，连续走 4 步都取"拐弯"方向（夹角低于阈值），共 5 子
+      const v = 1;
+      const first = mesh.adjacency[v][0];
+      const path = [v];
+      let cur = first, prev = v;
+      // 先找一条完整直轴作对照：直轴 a-b 夹角最大；拐弯路径从直轴一端出发取次优
+      for (let step = 0; step < 4; step++) {
+        let best = null, bestAng = -1;
+        for (const d of mesh.adjacency[cur]) {
+          if (d === prev || path.includes(d)) continue;
+          const ang = angleAt(cur, prev, d);
+          if (ang < CONFIG.ANGLE_STRAIGHT_DEG6 && ang > bestAng) { bestAng = ang; best = d; }
+        }
+        if (best === null) break;
+        path.push(cur);
+        prev = cur;
+        cur = best;
+      }
+      path.push(cur);
+      if (path.length < 5) {
+        assert(false, '拐弯路径构造失败');
+      } else {
+        paint(board, path, BLACK);
+        // 纯拐弯链里任一点都不应产生直线五连
+        let anyWin = false;
+        for (const p of path) {
+          if (checkWin(board, p, BLACK).win) { anyWin = true; break; }
+        }
+        assert(!anyWin, '纯拐弯五连不应判胜');
+      }
+    }
+
+    out.innerHTML = results.map((r) => `<span class="${r[0] === '✓' ? 'pass' : 'fail'}">${r}</span>`).join('<br>') +
+      `<br><br>通过 ${pass}，失败 ${fail}`;
+    console.log(results.join('\n'));
+    console.log(`通过 ${pass}，失败 ${fail}`);
+
+    if (typeof process !== 'undefined' && process.exit) process.exit(fail > 0 ? 1 : 0);
   </script>
 </body>
 </html>

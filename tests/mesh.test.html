@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>网格结构校验</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #0a0e1a; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    pre { background: #141a2e; padding: 16px; border-radius: 6px; white-space: pre-wrap; }
+    .pass { color: #6fd66f; } .fail { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <h1>网格生成结构校验（icosphere + validate）</h1>
+  <pre id="output"></pre>
+  <script type="module">
+    import { generateIcosphere } from '../js/mesh/icosphere.js';
+    import { validateMesh } from '../js/mesh/validate.js';
+
+    // 无头运行（tests/run.mjs）下无 document，退化为空壳
+    const out = typeof document !== 'undefined' ? document.getElementById('output') : { innerHTML: '' };
+    let pass = 0, fail = 0;
+    const results = [];
+
+    function assert(cond, msg) {
+      if (cond) { pass++; results.push('✓ ' + msg); }
+      else { fail++; results.push('✗ ' + msg); }
+    }
+
+    // 对每个可选细分频率（与 index.html 下拉框一致）全量校验
+    for (const n of [2, 3, 4, 5, 6]) {
+      const mesh = generateIcosphere(n);
+      const V = mesh.positions.length / 3;
+
+      let edgeCount = 0;
+      for (const v of mesh.adjacency) edgeCount += v.length;
+
+      assert(V === 10 * n * n + 2, `n=${n}: V=${V} = 10n²+2`);
+      assert(edgeCount === 60 * n * n, `n=${n}: 邻接度和=${edgeCount} = 2E = 60n²`);
+      assert(mesh.faces.length === 20 * n * n, `n=${n}: F=${mesh.faces.length} = 20n²`);
+
+      // validateMesh 会直接抛错，能走到这里即结构校验通过
+      const stats = validateMesh(mesh, n);
+      assert(stats.degree5Count === 12, `n=${n}: 五价点恰好 12 个`);
+      console.log(`n=${n}: V=${V}, E=${stats.E}, F=${stats.F}, 五价点=${stats.degree5Count}`);
+
+      // 邻接表升序、无重复
+      let sorted = true;
+      for (let v = 0; v < V; v++) {
+        const adj = mesh.adjacency[v];
+        for (let i = 0; i < adj.length; i++) {
+          if (i > 0 && adj[i] <= adj[i - 1]) { sorted = false; break; }
+        }
+      }
+      assert(sorted, `n=${n}: 邻接表升序无重复`);
+
+      // 度数分布：仅 5 与 6
+      let deg5 = 0, deg6 = 0;
+      for (let v = 0; v < V; v++) {
+        const d = mesh.adjacency[v].length;
+        if (d === 5) deg5++;
+        else if (d === 6) deg6++;
+      }
+      assert(deg5 === 12 && deg6 === V - 12, `n=${n}: 度数分布 5价=${deg5}, 6价=${deg6}`);
+    }
+
+    out.innerHTML = results.map((r) => `<span class="${r[0] === '✓' ? 'pass' : 'fail'}">${r}</span>`).join('<br>') +
+      `<br><br>通过 ${pass}，失败 ${fail}`;
+    console.log(results.join('\n'));
+    console.log(`通过 ${pass}，失败 ${fail}`);
+
+    if (typeof process !== 'undefined' && process.exit) process.exit(fail > 0 ? 1 : 0);
+  </script>
+</body>
+</html>

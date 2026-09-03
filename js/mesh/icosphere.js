@@ -2,8 +2,6 @@
 // 返回结构：positions / adjacency / faces / degree5Vertices
 // 落子逻辑只依赖 adjacency，不依赖 positions
 
-import { CONFIG } from '../config.js';
-
 const PHI = (1 + Math.sqrt(5)) / 2;
 
 function normalize3(v) {
@@ -43,9 +41,13 @@ export function generateIcosphere(n) {
   function point(A, B, C, a, b) {
     const c = n - a - b;
     const u = a / n, v = b / n, w = c / n;
-    const x = u * A[0] + v * B[0] + w * C[0];
-    const y = u * A[1] + v * B[1] + w * C[1];
-    const z = u * A[2] + v * B[2] + w * C[2];
+    // 重心组合得到的点在三角形平面内（球内），必须投影回单位球面，
+    // 否则细分网格仍是平面三角面而非球面（欧氏距离判定也会失真）
+    let x = u * A[0] + v * B[0] + w * C[0];
+    let y = u * A[1] + v * B[1] + w * C[1];
+    let z = u * A[2] + v * B[2] + w * C[2];
+    const len = Math.sqrt(x * x + y * y + z * z);
+    x /= len; y /= len; z /= len;
     return addVertex(x, y, z);
   }
 

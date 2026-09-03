@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
-import { BLACK, WHITE } from '../game/rules.js';
+import { BLACK } from '../game/rules.js';
 
 export class StoneView {
   constructor(scene) {
@@ -29,6 +29,11 @@ export class StoneView {
 
     // 胜线高亮（管状）
     this.winLineMesh = null;
+    // 胜利压暗：胜线顶点集合，null 表示未压暗
+    this.winSet = null;
+    // 当前每颗子的顶点归属（rebuild 时记录）
+    this.blackVerts = [];
+    this.whiteVerts = [];
   }
 
   makeMat(color) {
@@ -39,31 +44,45 @@ export class StoneView {
     });
   }
 
-  // 从 board 状态重建棋子
+  // 从 board 状态重建棋子（记录每颗子的顶点归属，供胜利压暗使用）
   rebuild(board) {
-    let bi = 0, wi = 0;
-    const dummy = new THREE.Object3D();
+    this.board = board;
+    this.blackVerts = [];
+    this.whiteVerts = [];
     for (let v = 0; v < board.occupied.length; v++) {
       const c = board.occupied[v];
       if (c === null) continue;
-      const pos = new THREE.Vector3(
-        board.mesh.positions[v * 3],
-        board.mesh.positions[v * 3 + 1],
-        board.mesh.positions[v * 3 + 2]
-      );
-      // 棋子略微浮出球面
-      pos.normalize().multiplyScalar(pos.length() + CONFIG.STONE_Z_OFFSET);
-      const mesh = c === BLACK ? this.blackMesh : this.whiteMesh;
-      dummy.position.copy(pos);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(c === BLACK ? bi++ : wi++, dummy.matrix);
+      if (c === BLACK) this.blackVerts.push(v);
+      else this.whiteVerts.push(v);
     }
-    this.blackMesh.count = bi;
-    this.whiteMesh.count = wi;
-    this.blackMesh.instanceMatrix.needsUpdate = true;
-    this.whiteMesh.instanceMatrix.needsUpdate = true;
-    this.blackMesh.frustumCulled = false;
-    this.whiteMesh.frustumCulled = false;
+    this.applyMatrices();
+  }
+
+  // 把当前棋子布局写入两个 InstancedMesh（尊重胜利压暗状态）
+  applyMatrices() {
+    const dummy = new THREE.Object3D();
+    const put = (mesh, verts) => {
+      for (let i = 0; i < verts.length; i++) {
+        const v = verts[i];
+        dummy.position.set(
+          this.mesh.positions[v * 3],
+          this.mesh.positions[v * 3 + 1],
+          this.mesh.positions[v * 3 + 2]
+        );
+        // 棋子略微浮出球面
+        dummy.position.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET);
+        // 压暗状态下非胜线子缩小，视觉上弱于胜线子
+        const dimmed = this.winSet && !this.winSet.has(v);
+        dummy.scale.setScalar(dimmed ? 0.7 : 1);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      }
+      mesh.count = verts.length;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.frustumCulled = false;
+    };
+    put(this.blackMesh, this.blackVerts);
+    put(this.whiteMesh, this.whiteVerts);
   }
 
   setHover(vertexIndex, player, visible) {
@@ -88,7 +107,7 @@ export class StoneView {
       this.mesh.positions[v * 3 + 2]
     );
     // 棋子浮出球面
-    return p.normalize().multiplyScalar(p.length() + CONFIG.STONE_Z_OFFSET);
+    return p.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET);
   }
 
   // 标记胜线
@@ -104,6 +123,12 @@ export class StoneView {
     this.group.add(this.winLineMesh);
   }
 
+  // 其余棋子压暗（胜利时调用）：非胜线子缩小
+  dimOthers(winLine) {
+    this.winSet = new Set(winLine || []);
+    this.applyMatrices();
+  }
+
   clearWin() {
     if (this.winLineMesh) {
       this.group.remove(this.winLineMesh);
@@ -111,17 +136,10 @@ export class StoneView {
       this.winLineMesh.material.dispose();
       this.winLineMesh = null;
     }
-  }
-
-  // 其余棋子压暗（胜利时调用）
-  dimOthers(winLine) {
-    const winSet = new Set(winLine || []);
-    // 简单处理：胜线子保持，其余调暗用材质全局透明度占位
-    // 实际可用后处理或双 pass，这里为性能压暗非胜线
-  }
-
-  render() {
-    // InstancedMesh 更新后自动渲染，占位
+    if (this.winSet !== null) {
+      this.winSet = null;
+      this.applyMatrices();
+    }
   }
 }
 

@@ -1,19 +1,15 @@
 // M1 网格校验：V/E/F 公式、12 个五价点、邻接对称性
 // 网格初始化后必须全量校验，不通过直接抛错
 
-import { CONFIG } from '../config.js';
-
-export function validateMesh(mesh) {
+export function validateMesh(mesh, n) {
   const { positions, adjacency, faces, degree5Vertices } = mesh;
   const errors = [];
 
   const V = positions.length / 3;
-  const E = 0; // 下面统计
   let edgeCount = 0;
   for (const v of adjacency) edgeCount += v.length;
 
-  // 1) V 公式：V = 10n² + 2
-  const n = CONFIG.SUBDIVISION_FREQ;
+  // 1) V 公式：V = 10n² + 2（n 为实际细分频率，不能取全局默认值）
   const expectedV = 10 * n * n + 2;
   if (V !== expectedV) {
     errors.push(`顶点数 ${V} ≠ 公式值 ${expectedV} (n=${n})`);

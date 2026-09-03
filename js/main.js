@@ -20,20 +20,64 @@ class Game {
     this.boardView = new BoardView(this.scene);
     this.stoneView = new StoneView(this.scene);
     this.raycaster = null;
+    this.currentN = CONFIG.SUBDIVISION_FREQ;
 
     this.statusTurn = document.getElementById('status-turn');
     this.statusPlayer = document.getElementById('status-player');
     this.statusMessage = document.getElementById('status-message');
+    this.selWinN = document.getElementById('sel-win-n');
+    this.selFreq = document.getElementById('sel-freq');
 
-    this.rebuild(CONFIG.SUBDIVISION_FREQ);
+    this.rebuild(this.currentN);
+
+    // UI 事件
+    document.getElementById('btn-new').addEventListener('click', () => this.newGame());
+    document.getElementById('btn-undo').addEventListener('click', () => this.undo());
+    this.selWinN.addEventListener('change', () => {
+      // WIN_N 只影响后续判胜；重放历史保证当前局面判胜状态一致
+      CONFIG.WIN_N = parseInt(this.selWinN.value, 10);
+      this.replayAll();
+      this.stoneView.clearWin();
+      if (this.board.won) {
+        this.stoneView.highlightWin(this.board.winningLine);
+        this.stoneView.dimOthers(this.board.winningLine);
+        const name = this.board.winner === 1 ? '黑方' : '白方';
+        this.statusMessage.textContent = `连珠数改为 ${CONFIG.WIN_N}，${name}获胜！`;
+        return;
+      }
+      this.updateUI();
+      this.statusMessage.textContent = `连珠数改为 ${CONFIG.WIN_N}`;
+    });
+    this.selFreq.addEventListener('change', () => {
+      const n = parseInt(this.selFreq.value, 10);
+      if (n === this.currentN) return;
+      // 重建棋盘会清空对局，需二次确认
+      if (!confirm(`细分频率改为 ${n} 将重建棋盘并清空当前对局，确定吗？`)) {
+        this.selFreq.value = String(this.currentN);
+        return;
+      }
+      this.currentN = n;
+      this.rebuild(n);
+    });
+
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+  }
+
+  // 重放整段历史（切换 WIN_N 后恢复局面）
+  replayAll() {
+    const moves = [];
+    while (this.board.history.length > 0) moves.push(this.board.undo());
+    for (const m of moves.reverse()) this.board.place(m.v);
+    if (this.board.won) {
+      this.stoneView.highlightWin(this.board.winningLine);
+    }
   }
 
   // 重建棋盘（细分频率改变时调用，清空对局）
   rebuild(n) {
     this.mesh = generateIcosphere(n);
-    const stats = validateMesh(this.mesh); // 不通过会抛错
+    const stats = validateMesh(this.mesh, n); // 不通过会抛错
     console.log('网格生成校验通过', stats);
 
     // 重建 board
@@ -63,9 +107,9 @@ class Game {
 
     if (res.won) {
       this.stoneView.highlightWin(res.line);
+      this.stoneView.dimOthers(res.line);
       const name = res.player === 1 ? '黑方' : '白方';
       this.statusMessage.textContent = `${name}获胜！`;
-      this.dimOthers(res.line);
     } else if (res.isDraw) {
       this.statusMessage.textContent = '和棋！';
     } else {
@@ -75,17 +119,13 @@ class Game {
     this.raycaster.clearHover();
   }
 
-  dimOthers(winLine) {
-    // 简单压暗：非胜线子调透明度，胜线子保持
-    // 这里用双材质思路太复杂，暂用场景整体不处理，仅高亮胜线
-  }
-
   undo() {
-    this.board.undo();
+    const last = this.board.undo();
+    if (!last) return;
     this.stoneView.rebuild(this.board);
     this.stoneView.clearWin();
     this.updateUI();
-    this.statusMessage.textContent = '悔棋，轮到白方';
+    this.statusMessage.textContent = `悔棋（第 ${this.board.history.length + 1} 手），轮到${last.player === 1 ? '黑方' : '白方'}`;
     this.raycaster.clearHover();
   }
 
@@ -115,5 +155,5 @@ class Game {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  window.game = new Game();
+  new Game();
 });

@@ -30,11 +30,6 @@ function clampDot(x) {
   return Math.max(-1, Math.min(1, x));
 }
 
-// 判断 a-v-b 是否为近直线（用于六价点选轴、延伸选点）
-function isNearlyStraight(positions, v, a, b, threshold) {
-  return angleAt(positions, v, a, b) >= threshold;
-}
-
 /**
  * 枚举 v 处的所有轴向（无序邻居对 {a, b}）。
  * 6价点：贪心选3条独立轴，互不相交的邻居对，夹角最大优先。
@@ -74,6 +69,8 @@ function getAxes(adjacency, v, positions) {
 
 /**
  * 从 start 出发、由 cameFrom 进入方向，沿最直方向（最大夹角）同色延伸。
+ * 只有"近直线"延续才算连珠：某步的转角低于价数对应阈值即视为断线，
+ * 否则 zigzag 的拐弯也会被贪心延伸串成假连珠。
  * 用 visited 集防止在球面上来回绕圈。
  */
 function extend(board, start, cameFrom, player) {
@@ -95,6 +92,11 @@ function extend(board, start, cameFrom, player) {
       if (ang > bestAng) { bestAng = ang; best = d; }
     }
     if (best === null) break;
+    // 六价点穿行 144°+、五价点穿行 132°+ 才算"近直线"，低于阈值是拐弯
+    const straightMin = adjacency[cur].length === 5
+      ? CONFIG.ANGLE_STRAIGHT_DEG5
+      : CONFIG.ANGLE_STRAIGHT_DEG6;
+    if (bestAng < straightMin) break;
     prev = cur;
     cur = best;
   }
@@ -107,13 +109,14 @@ function extend(board, start, cameFrom, player) {
  * 返回 { win, line }，line 为获胜连珠顶点序列。
  */
 export function checkWin(board, vertexIndex, player) {
-  const threshold = 2.2; // ~126°，六价点144°/180°满足，五价点120°略低但可接受
-  const axes = getAxes(board.mesh.adjacency, vertexIndex, board.mesh.positions, threshold);
+  const axes = getAxes(board.mesh.adjacency, vertexIndex, board.mesh.positions);
 
   for (const { a, b } of axes) {
+    // extend 返回从邻居向远端排列的序列（fwd[0] 是 a 本身），
+    // 拼回时必须反转，使 line 从 a 端经 vertexIndex 到 b 端连续相邻
     const fwd = extend(board, a, vertexIndex, player);
     const bwd = extend(board, b, vertexIndex, player);
-    const line = [...fwd, vertexIndex, ...bwd];
+    const line = [...fwd.reverse(), vertexIndex, ...bwd];
     if (line.length >= CONFIG.WIN_N) {
       return { win: true, line };
     }
