@@ -58,6 +58,26 @@ export function validateMesh(mesh, n) {
     }
   }
 
+  // 8) 面绕序统一朝外（FrontSide 实体渲染依赖，倒立三角形会反过来）
+  for (const [a, b, c] of faces) {
+    const abx = positions[b * 3] - positions[a * 3];
+    const aby = positions[b * 3 + 1] - positions[a * 3 + 1];
+    const abz = positions[b * 3 + 2] - positions[a * 3 + 2];
+    const acx = positions[c * 3] - positions[a * 3];
+    const acy = positions[c * 3 + 1] - positions[a * 3 + 1];
+    const acz = positions[c * 3 + 2] - positions[a * 3 + 2];
+    const nx = aby * acz - abz * acy;
+    const ny = abz * acx - abx * acz;
+    const nz = abx * acy - aby * acx;
+    const dot = nx * (positions[a * 3] + positions[b * 3] + positions[c * 3])
+      + ny * (positions[a * 3 + 1] + positions[b * 3 + 1] + positions[c * 3 + 1])
+      + nz * (positions[a * 3 + 2] + positions[b * 3 + 2] + positions[c * 3 + 2]);
+    if (dot <= 0) {
+      errors.push(`面 ${[a, b, c]} 绕序朝内`);
+      break;
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(`网格校验失败：\n  - ${errors.join('\n  - ')}`);
   }

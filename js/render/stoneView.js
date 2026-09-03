@@ -1,8 +1,17 @@
-// M3 棋子：InstancedMesh 实例化渲染 + 落子动画 + 胜线高亮
+// M3 棋子：InstancedMesh 实例化渲染 + 悬停预览 + 胜线高亮
+// 纸面印刷风（非真实渲染，无光照）：
+//   棋子 = 沿球面法向压扁的扁球（STONE_SQUASH=0.5），底部贴临纸面实体，
+//           每个实例按所在顶点法向定向（局部 +Z 对齐外法线）。
+//   黑子 = 墨色扁球；白子 = 纸色扁球。
+//   描边 = 所有棋子外覆一层略大的"墨壳"（BackSide 渲染，倒置外壳法）：
+//           黑/白子同外轮廓（STONE_RADIUS+STONE_OUTLINE），视觉大小一致。
+// 全部材质用 MeshBasicMaterial，场景无灯光。
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { BLACK } from '../game/rules.js';
+
+const UP = new THREE.Vector3(0, 0, 1); // 扁球压扁轴（局部 +Z），将对齐球面法向
 
 export class StoneView {
   constructor(scene) {
@@ -10,24 +19,59 @@ export class StoneView {
     this.group = new THREE.Group();
     this.scene.group.add(this.group);
 
-    // 棋子池（黑、白各一个 InstancedMesh）
     this.maxStones = 1024; // 留余量
-    this.geo = new THREE.SphereGeometry(CONFIG.STONE_RADIUS, 16, 12);
-    this.blackMesh = new THREE.InstancedMesh(this.geo, this.makeMat(CONFIG.COLOR_BLACK), this.maxStones);
-    this.whiteMesh = new THREE.InstancedMesh(this.geo, this.makeMat(CONFIG.COLOR_WHITE), this.maxStones);
-    this.blackMesh.count = 0;
-    this.whiteMesh.count = 0;
-    this.group.add(this.blackMesh);
-    this.group.add(this.whiteMesh);
 
-    // 悬停预览
-    this.hoverGeo = new THREE.SphereGeometry(CONFIG.STONE_RADIUS, 16, 12);
-    this.hoverMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(CONFIG.COLOR_HOVER), transparent: true, opacity: 0.5 });
-    this.hoverMesh = new THREE.Mesh(this.hoverGeo, this.hoverMat);
-    this.hoverMesh.visible = false;
-    this.group.add(this.hoverMesh);
+    // 黑子：墨色芯 + 墨色壳（同色壳只决定外轮廓，与白子等大）
+    const shellRadius = CONFIG.STONE_RADIUS + CONFIG.STONE_OUTLINE;
+    this.blackShellGeo = this.makeFlatGeo(shellRadius);
+    this.blackShellMat = this.makeInkMat();
+    this.blackShellMat.side = THREE.BackSide;
+    this.blackShell = new THREE.InstancedMesh(this.blackShellGeo, this.blackShellMat, this.maxStones);
+    this.blackShell.count = 0;
+    this.group.add(this.blackShell);
 
-    // 胜线高亮（管状）
+    this.blackCoreGeo = this.makeFlatGeo(CONFIG.STONE_RADIUS);
+    this.blackCoreMat = this.makeInkMat();
+    this.blackCore = new THREE.InstancedMesh(this.blackCoreGeo, this.blackCoreMat, this.maxStones);
+    this.blackCore.count = 0;
+    this.group.add(this.blackCore);
+
+    // 白子：墨色壳（描边）+ 纸色芯
+    this.whiteShellGeo = this.makeFlatGeo(shellRadius);
+    this.whiteShellMat = this.makeInkMat();
+    this.whiteShellMat.side = THREE.BackSide;
+    this.whiteShell = new THREE.InstancedMesh(this.whiteShellGeo, this.whiteShellMat, this.maxStones);
+    this.whiteShell.count = 0;
+    this.group.add(this.whiteShell);
+
+    this.whiteCoreGeo = this.makeFlatGeo(CONFIG.STONE_RADIUS);
+    this.whiteCoreMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(CONFIG.COLOR_PAPER), // 填充与背景纸色一致
+    });
+    this.whiteCore = new THREE.InstancedMesh(this.whiteCoreGeo, this.whiteCoreMat, this.maxStones);
+    this.whiteCore.count = 0;
+    this.group.add(this.whiteCore);
+
+    // 悬停预览：黑执子 = 半透明墨扁球；白执子 = 半透明墨圈（提示落点轮廓）
+    this.hoverBlackGeo = this.makeFlatGeo(CONFIG.STONE_RADIUS * 0.9);
+    this.hoverBlackMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(CONFIG.COLOR_HOVER), transparent: true, opacity: 0.45,
+    });
+    this.hoverBlack = new THREE.Mesh(this.hoverBlackGeo, this.hoverBlackMat);
+    this.hoverBlack.visible = false;
+    this.group.add(this.hoverBlack);
+
+    this.hoverWhiteGeo = new THREE.TorusGeometry(
+      CONFIG.STONE_RADIUS + CONFIG.STONE_OUTLINE, CONFIG.STONE_OUTLINE, 10, 28
+    );
+    this.hoverWhiteMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(CONFIG.COLOR_HOVER), transparent: true, opacity: 0.55,
+    });
+    this.hoverWhite = new THREE.Mesh(this.hoverWhiteGeo, this.hoverWhiteMat);
+    this.hoverWhite.visible = false;
+    this.group.add(this.hoverWhite);
+
+    // 胜线高亮（粗墨管，高于棋子顶部）
     this.winLineMesh = null;
     // 胜利压暗：胜线顶点集合，null 表示未压暗
     this.winSet = null;
@@ -36,12 +80,15 @@ export class StoneView {
     this.whiteVerts = [];
   }
 
-  makeMat(color) {
-    return new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.35,
-      metalness: 0.1,
-    });
+  // 扁球几何：球体沿 +Z 压扁 STONE_SQUASH（高度为半径方向的一半）
+  makeFlatGeo(radius) {
+    const geo = new THREE.SphereGeometry(radius, 24, 16);
+    geo.scale(1, 1, CONFIG.STONE_SQUASH);
+    return geo;
+  }
+
+  makeInkMat() {
+    return new THREE.MeshBasicMaterial({ color: new THREE.Color(CONFIG.COLOR_INK) });
   }
 
   // 从 board 状态重建棋子（记录每颗子的顶点归属，供胜利压暗使用）
@@ -58,19 +105,24 @@ export class StoneView {
     this.applyMatrices();
   }
 
-  // 把当前棋子布局写入两个 InstancedMesh（尊重胜利压暗状态）
+  // 写入各 InstancedMesh：扁球需按顶点法向逐实例定向（尊重胜利压暗：非胜线子缩小）
   applyMatrices() {
     const dummy = new THREE.Object3D();
+    const quat = new THREE.Quaternion();
+    const normal = new THREE.Vector3();
     const put = (mesh, verts) => {
       for (let i = 0; i < verts.length; i++) {
         const v = verts[i];
-        dummy.position.set(
+        normal.set(
           this.mesh.positions[v * 3],
           this.mesh.positions[v * 3 + 1],
           this.mesh.positions[v * 3 + 2]
-        );
-        // 棋子略微浮出球面
-        dummy.position.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET);
+        ).normalize();
+        // 中心浮于纸面实体之上，底部贴临球面
+        dummy.position.copy(normal).multiplyScalar(1 + CONFIG.STONE_Z_OFFSET);
+        // 压扁轴 +Z 对齐球面法向
+        quat.setFromUnitVectors(UP, normal);
+        dummy.quaternion.copy(quat);
         // 压暗状态下非胜线子缩小，视觉上弱于胜线子
         const dimmed = this.winSet && !this.winSet.has(v);
         dummy.scale.setScalar(dimmed ? 0.7 : 1);
@@ -81,43 +133,66 @@ export class StoneView {
       mesh.instanceMatrix.needsUpdate = true;
       mesh.frustumCulled = false;
     };
-    put(this.blackMesh, this.blackVerts);
-    put(this.whiteMesh, this.whiteVerts);
+    put(this.blackShell, this.blackVerts);
+    put(this.blackCore, this.blackVerts);
+    put(this.whiteShell, this.whiteVerts);
+    put(this.whiteCore, this.whiteVerts);
   }
 
+  // 悬停预览：按执子方显示对应形状，浮在目标顶点上
   setHover(vertexIndex, player, visible) {
-    if (!visible || vertexIndex === null || vertexIndex === undefined) {
-      this.hoverMesh.visible = false;
-      return;
-    }
+    const show = visible && vertexIndex !== null && vertexIndex !== undefined;
+    this.hoverBlack.visible = false;
+    this.hoverWhite.visible = false;
+    if (!show) return;
+
     const p = this.meshPos(vertexIndex);
-    this.hoverMesh.position.copy(p);
-    this.hoverMat.color.set(player === BLACK ? CONFIG.COLOR_BLACK : CONFIG.COLOR_WHITE);
-    this.hoverMesh.visible = true;
+    const normal = p.clone().normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(UP, normal);
+    if (player === BLACK) {
+      this.hoverBlack.position.copy(p);
+      this.hoverBlack.quaternion.copy(quat);
+      this.hoverBlack.visible = true;
+    } else {
+      this.hoverWhite.position.copy(p);
+      this.hoverWhite.quaternion.copy(quat);
+      this.hoverWhite.visible = true;
+    }
   }
 
   setMesh(mesh) {
     this.mesh = mesh;
   }
 
+  // 棋子中心位置（底面贴临纸面实体）
   meshPos(v) {
     const p = new THREE.Vector3(
       this.mesh.positions[v * 3],
       this.mesh.positions[v * 3 + 1],
       this.mesh.positions[v * 3 + 2]
     );
-    // 棋子浮出球面
     return p.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET);
   }
 
-  // 标记胜线
+  // 胜线所在半径：略高于压扁棋子顶面，避免管子被棋子遮住
+  winLinePos(v) {
+    const topRadius = (CONFIG.STONE_RADIUS + CONFIG.STONE_OUTLINE) * CONFIG.STONE_SQUASH;
+    const p = new THREE.Vector3(
+      this.mesh.positions[v * 3],
+      this.mesh.positions[v * 3 + 1],
+      this.mesh.positions[v * 3 + 2]
+    );
+    return p.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET + topRadius + 0.006);
+  }
+
+  // 标记胜线（粗墨管高亮，与印刷风一致）
   highlightWin(line) {
     this.clearWin();
     if (!line || line.length < 2) return;
 
-    const points = line.map((v) => this.meshPos(v));
+    const points = line.map((v) => this.winLinePos(v));
     const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(8, line.length * 8), 0.015, 8, false);
+    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(8, line.length * 8), 0.014, 10, false);
     const tubeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(CONFIG.COLOR_WIN) });
     this.winLineMesh = new THREE.Mesh(tubeGeo, tubeMat);
     this.group.add(this.winLineMesh);

@@ -78,6 +78,36 @@ export function generateIcosphere(n) {
     i++;
   }
 
+  // 统一三角面为朝外绕序：细分产生的"倒立"三角形与父面绕序相反，
+  // 实体渲染（FrontSide 遮挡）会把朝内的面当背面剔除，形成破洞透出背面网格。
+  // 按叉积法向与面心方向的点积重排顶点，确保从球外看全部为逆时针。
+  for (const f of outFaces) {
+    const [a, b, c] = f;
+    const ab = [
+      positions[b * 3] - positions[a * 3],
+      positions[b * 3 + 1] - positions[a * 3 + 1],
+      positions[b * 3 + 2] - positions[a * 3 + 2],
+    ];
+    const ac = [
+      positions[c * 3] - positions[a * 3],
+      positions[c * 3 + 1] - positions[a * 3 + 1],
+      positions[c * 3 + 2] - positions[a * 3 + 2],
+    ];
+    const n = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    // 面心方向（未归一化即可判断朝向）
+    const cx = positions[a * 3] + positions[b * 3] + positions[c * 3];
+    const cy = positions[a * 3 + 1] + positions[b * 3 + 1] + positions[c * 3 + 1];
+    const cz = positions[a * 3 + 2] + positions[b * 3 + 2] + positions[c * 3 + 2];
+    if (n[0] * cx + n[1] * cy + n[2] * cz < 0) {
+      f[1] = c;
+      f[2] = b;
+    }
+  }
+
   // 邻接表（升序）
   const adjacency = Array.from({ length: V }, () => new Set());
   for (const [a, b, c] of outFaces) {

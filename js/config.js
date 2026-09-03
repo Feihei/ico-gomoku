@@ -4,7 +4,7 @@ export const CONFIG = {
   // 二十面体细分频率 n，顶点数 V = 10n² + 2
   SUBDIVISION_FREQ: 5,
 
-  // 获胜连珠数，球面棋盘建议测 5 和 6
+  // 获胜连珠数（固定 5，v1 无 UI 入口，勿改）
   WIN_N: 5,
 
   // 连珠"近直线"延续夹角阈值（弧度）。
@@ -15,15 +15,18 @@ export const CONFIG = {
   ANGLE_STRAIGHT_DEG6: 2.35, // ≈134.7°，介于六价直行(144°+)与拐弯(≤133°)之间
   ANGLE_STRAIGHT_DEG5: 2.0,  // ≈114.6°，介于五价穿行(132°+)与相邻拐弯(72°)之间
 
-  // 颜色
-  COLOR_BLACK: '#1a1a1a',      // 黑子
-  COLOR_WHITE: '#f0e8d0',      // 象牙白
-  COLOR_LINE: '#3a4a6a',       // 网格线
-  COLOR_STAR: '#ffd700',       // 星位点金色
-  COLOR_HOVER: '#88aaff',      // 悬停预览
-  COLOR_WIN: '#ff4444',        // 胜线高亮
-  COLOR_BG_TOP: '#0a0e1a',     // 背景渐变上
-  COLOR_BG_BOTTOM: '#1a2040',  // 背景渐变下
+  // ── 纸面印刷风调色板（非真实渲染） ──
+  // 页面底色、棋盘纸面球、白子填充共用同一纸色（底与球一致）
+  COLOR_PAPER: '#f4ecd9',     // 纸色（页面底色 = 球面 = 白子填充）
+  COLOR_INK: '#241f18',       // 主墨色（黑子、胜线、白子描边、UI 文字）
+  COLOR_LINE: '#2e2922',      // 网格线（墨线）
+  COLOR_STAR: '#1f1b15',      // 星位点小点（五价点标记）
+  COLOR_HOVER: '#4a4334',     // 悬停预览（半透明墨）
+  COLOR_WIN: '#1a1611',       // 胜线（粗墨管）
+
+  // 纸纹噪波（模拟纸面质感，平涂 + 细颗粒）
+  PAPER_NOISE_STRENGTH: 0.05, // 噪波亮度扰动幅度（0~1，0.05 ≈ 纸纤维细粒）
+  PAPER_NOISE_TILE: 8,        // 噪波纹理在球面/背景上的重复次数
 
   // 相机参数
   CAMERA_FOV: 45,
@@ -32,8 +35,12 @@ export const CONFIG = {
   CAMERA_POSITION: [0, 0, 6],  // 球心在原点，相机沿 +Z
 
   // 几何体尺寸
-  VERTEX_MARKER_RADIUS: 0.02,  // 普通顶点小点
-  STAR_RING_RADIUS: 0.06,      // 星位点圆环半径（明显更大）
-  STONE_RADIUS: 0.05,          // 棋子半径
-  STONE_Z_OFFSET: 0.03,        // 棋子略微浮出球面
+  // 纸面实体（遮挡面）= 同细分 icosphere 三角面整体微缩，保证每根网格线都严格在其
+  // 外侧（无 z-fight），背面被自身遮挡
+  OCCLUDER_SCALE: 0.99,
+  STAR_MARK_RADIUS: 0.014,     // 星位点：普通交叉点小点样式（普通顶点不画点，仅此 12 处标记）
+  STONE_RADIUS: 0.05,          // 棋子体积半径（黑子墨球 / 白子纸球外轮廓）
+  STONE_OUTLINE: 0.009,        // 棋子黑色描边壳厚度（黑/白子均有，外轮廓一致避免白子显大）
+  STONE_SQUASH: 0.5,           // 棋子沿球面法向压扁系数（原高度的一半，扁平贴面）
+  STONE_Z_OFFSET: 0.02,        // 棋子中心相对顶点球面（半径 1.0）的抬升：底面贴临纸面实体
 };
