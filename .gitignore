@@ -19,3 +19,9 @@ __pycache__/
 
 # Node（项目禁止 npm 依赖，此处仅为防手滑）
 node_modules/
+
+# three.js 改为 jsdelivr CDN 引入，本地 vendor 文件不再追踪
+js/vendor/
+
+# info.svg 仅在 Inkscape 中人工编辑，不随仓库追踪
+info.svg
