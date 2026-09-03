@@ -54,8 +54,12 @@
 ```
 spherical-gomoku/
 ├── index.html          # 入口，DOM 骨架
+├── info.txt            # 游戏说明正文（圆 i 弹层展示内容）
+├── info.svg            # 游戏说明备选图（Inkscape 制作；当前弹层用 info.txt 文字 + 子集字体渲染，未启用）
 ├── css/
 │   └── style.css       # UI 样式
+├── fonts/
+│   └── GenWanMin2TC-R-subset.woff2  # 子集化字体（收集源码与 info.txt 全部用字，约 219KB）
 ├── js/
 │   ├── main.js         # 入口：初始化渲染循环、装配各模块
 │   ├── config.js       # 所有可调常量（细分频率、胜利连珠数、颜色、相机参数）
@@ -67,7 +71,7 @@ spherical-gomoku/
 │   │   ├── rules.js        # 合法性判定、连珠检测、胜负/平局判定
 │   │   └── history.js      # 手数记录（支持悔棋与复盘）
 │   ├── render/
-│   │   ├── scene.js        # Three.js 场景、灯光、相机、OrbitControls
+│   │   ├── scene.js        # Three.js 场景、相机、OrbitControls
 │   │   ├── boardView.js    # 网格线、顶点标记、星位点渲染
 │   │   └── stoneView.js    # 棋子网格池（实例化渲染）、落子动画、胜利连线高亮
 │   └── interaction/
@@ -78,7 +82,9 @@ spherical-gomoku/
     └── run.mjs             # 无头运行器：node tests/run.mjs（Node 中提取 HTML 页内脚本执行，供 CI/快速验证）
 ```
 
-**依赖引入**：ES Module + `importmap`，`three` 与 `OrbitControls` 以本地文件形式存放于 `js/vendor/`（保证离线可玩；如换 CDN 需同步改 `index.html` 的 importmap）。**禁止引入 Node 专属 API、打包器或 npm 依赖**——本项目必须在纯静态环境下运行。
+**依赖引入**：ES Module + `importmap`，`three` 与 `OrbitControls` 经 **jsdelivr CDN** 引入（版本锁定 `three@0.185.0`，见 `index.html`）。本地 `js/vendor/` 已从版本库移除并加入 `.gitignore`（不再追踪）。**禁止引入 Node 专属 API、打包器或 npm 依赖**——本项目必须在纯静态环境下运行（需联网加载 CDN）。
+
+**字体**：游戏文字使用**子集化字体** `GenWanMin2TC-R-subset.woff2`（@font-face 首选项，回退宋体栈）。该子集由 GenWanMin2TC-R（明体源字体，约 22MB，**已从仓库移除**）用 fontTools `pyftsubset` 按"源码 + info.txt 全部用字"切出（约 219KB/689 字形）；如 UI 文案新增字而子集缺失，需自行获取源字体后重切（`python -m pip install --break-system-packages fonttools brotli`，再 `python -m fontTools.subset <源OTF> --text-file=<用字清单> --output-file=fonts/GenWanMin2TC-R-subset.woff2 --flavor=woff2`）。
 
 **测试约定**：不引入测试框架，使用极简自写断言（`assert(cond, msg)`），以 HTML 页面承载、控制台输出结果。测试可独立打开运行；也可用 `node tests/run.mjs` 无头运行同一套断言（Node ≥ 22 对 `.mjs` 原生按 ESM 处理，项目无 `package.json`）。
 
@@ -137,15 +143,16 @@ checkWin(board, vertexIndex, player) // → { win: boolean, line: number[] | nul
 
 ## 7. UI 规范
 
-- **布局**：左侧竖向工具 bar（`#hud`），收起按钮 **✕ 置最左上角**（点击收起，折叠后仅剩左上角 ☰ 按钮可再展开），其余区域完全展示棋盘（canvas 全幅）
+- **布局**：左侧竖向工具 bar（`#hud`，**无边框**、固定宽度防消息撑宽），收起按钮 **✕ 置最左上角**（点击收起，折叠后仅剩 ☰ 可再展开）；其下方始终可见一个**圆圈 i 说明按钮**，其余区域完全展示棋盘（canvas 全幅）
 - bar 内容（竖排按钮组，信息区在下）：
-  - **模式切换**（`#btn-mode` 对战/人机）：v1 无 AI，人机为 **UI 占位**——点选后提示"人机 AI 开发中"并自动回退对战
-  - **细分频率 5/6 两档切换**（`#freq-group` 内两个按钮，选中档墨色反白；只有 5/6 两档）；切换重建棋盘会清空对局，需二次确认
+  - **模式切换**（`#btn-mode` 对战/人机）：v1 无 AI，人机为 **UI 占位**——点选后短暂提示"AI 开发中"并自动回退对战
+  - **细分频率切换按钮**（`#btn-freq`，文本即状态："细分五"/"细分六" 互切）；切换重建棋盘会清空对局，需二次确认
   - 新对局、悔棋、**导出棋局 JSON**（下载文件：细分频率、连珠数、全部手数、结果）
   - 信息区：手数、执子方、消息（**无"对局开始，黑先"式初始消息**，默认留空）
+- **游戏说明**：圆圈 i（`#btn-info`）点击后全屏弹层（`#info-modal`）展示 `info.txt` 正文，右上角 **X 退出**；正文用子集化字体排版
 - 获胜连珠数**固定 5**，无 UI 入口
 - **结束状态**：胜利/和棋时在**视口中央弹出大字**（`#win-overlay`："黑胜" / "白胜" / "和棋"，印刷风双线框大字），点新对局/悔棋/重建即消除
-- **风格**：全部 UI 为 HTML/CSS 覆盖层（纸底墨字印刷风），与 WebGL canvas 分层；**禁止在 WebGL 内绘制文字 UI**；文字、按钮、下拉框一律纸面底 + 墨色文字/描边，禁止玻璃拟态与彩色强调
+- **风格**：全部 UI 为 HTML/CSS 覆盖层（纸底墨字印刷风，文字字体首选项为子集化 `GenWanMin2TC-R`），与 WebGL canvas 分层；**禁止在 WebGL 内绘制文字 UI**；文字、按钮一律纸面底 + 墨色文字/描边，禁止玻璃拟态与彩色强调
 
 ## 8. 编码约定
 

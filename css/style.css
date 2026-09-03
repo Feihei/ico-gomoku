@@ -1,8 +1,16 @@
 /* 纸面印刷风：纸色底 + 墨色文字/控件，无玻璃拟态 */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* 子集化中文字体（GenWanMin2TC-R 提取项目用字，避免整包 22MB OTF 加载） */
+@font-face {
+  font-family: "GenWanMin2TC-R";
+  src: url("../fonts/GenWanMin2TC-R-subset.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+
 body {
-  font-family: "Noto Serif SC", "Songti SC", "SimSun", "STSong", serif;
+  font-family: "GenWanMin2TC-R", "Noto Serif SC", "Songti SC", "SimSun", "STSong", serif;
   background: #f4ecd9;           /* 纸色底（与画布纸面一致） */
   color: #241f18;                /* 墨色 */
   overflow: hidden;
@@ -28,7 +36,7 @@ body {
   background-repeat: repeat;
 }
 
-/* ── 左侧竖向工具 bar ── */
+/* ── 左侧竖向工具 bar（无边框） ── */
 #hud {
   position: absolute;
   top: 0;
@@ -36,22 +44,38 @@ body {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  background: rgba(244, 236, 217, 0.97);  /* 纸面 */
-  border-right: 1.5px solid #241f18;
-  box-shadow: 2px 0 0 rgba(36, 31, 24, 0.15);
+  width: 148px;                 /* 固定宽度：消息不撑宽 bar */
+  background: rgba(244, 236, 217, 0.6);  /* 纸面，无边框 */
 }
 
-/* 折叠态：只留最左上角 X 按钮，棋盘全幅展示 */
+/* 折叠态：只留最左上角 X 按钮与下方 info 圆钮，棋盘全幅展示 */
+#hud.collapsed { width: auto; }
 #hud.collapsed #hud-body { display: none; }
 
-/* 收起按钮：✕ 置最左上 */
-#btn-collapse {
-  align-self: flex-start;
+/* bar 头部：收起 ✕ 在上、说明 ⓘ 在下（纵向叠放，均不随折叠隐藏） */
+#hud-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px;
+}
+#hud-head button {
   width: 30px;
   height: 30px;
   padding: 0;
   font-size: 15px;
   line-height: 1;
+  background: transparent;
+  border: none;
+}
+#hud-head button:hover { background: #241f18; color: #f4ecd9; }
+
+/* 说明按钮：圆圈 i */
+#btn-info {
+  border-radius: 50%;
+  border: 1.5px solid #241f18 !important;
+  font-style: italic;
 }
 
 /* bar 主体：竖向按钮组 + 底部信息 */
@@ -60,33 +84,15 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  min-width: 132px;
+  width: 100%;
+  overflow: hidden;             /* 超长消息在此截断换行，不撑宽 */
 }
 
 #hud-body > button {
   font-size: 14px;
   padding: 7px 10px;
-  text-align: left;
-}
-
-/* 细分频率组（5/6 两档切换） */
-#freq-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  padding: 2px 0;
-}
-#freq-group .freq-btn {
-  flex: 1;
-  padding: 5px 8px;
-  font-size: 13px;
   text-align: center;
-}
-/* 选中档：墨色填充反白（印刷强调） */
-#freq-group .freq-btn.active {
-  background: #241f18;
-  color: #f4ecd9;
+  width: 100%;
 }
 
 /* 底部信息区 */
@@ -97,6 +103,7 @@ body {
   font-size: 13px;
   line-height: 1.9;
   letter-spacing: 0.03em;
+  word-break: break-all;        /* 长消息在固定宽度内折行 */
 }
 /* 强调数值：加粗墨字 + 下划线，模拟印刷强调 */
 #hud-info b {
@@ -106,6 +113,54 @@ body {
 }
 #status-message {
   font-weight: 600;
+}
+
+/* ── 游戏说明全屏弹层（展示 info.txt，印刷风） ── */
+#info-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;               /* 高于 win-overlay(500) 与 hud，低于噪波层(9999) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 236, 217, 0.85);
+}
+#info-modal[hidden] { display: none; }
+
+#info-panel {
+  position: relative;
+  max-width: min(760px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  background: #fbf6e8;         /* 纸白面板 */
+  border: 2px solid #241f18;
+  box-shadow: 6px 6px 0 rgba(36, 31, 24, 0.25);
+  padding: 28px 34px 24px;
+}
+#btn-info-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid #241f18;
+}
+#btn-info-close:hover { background: #241f18; color: #f4ecd9; }
+
+/* info.txt 正文：保留换行，大字号阅读 */
+#info-text {
+  font-family: inherit;
+  font-size: 22px;
+  line-height: 1.9;
+  letter-spacing: 0.05em;
+  white-space: pre-wrap;       /* 兼容窄屏自动换行 */
+  word-break: break-word;
+  color: #241f18;
 }
 
 /* 按钮/控件通用（纸白底 + 墨描边） */

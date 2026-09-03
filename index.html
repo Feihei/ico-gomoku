@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>球面五子棋</title>
+  <title>你会玩个球五子棋</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,14 +14,13 @@
 
     <!-- 左侧竖向工具 bar（✕ 置最左上角收起，其余区域全幅展示棋盘） -->
     <aside id="hud">
-      <button id="btn-collapse" type="button" title="收起 / 展开面板">✕</button>
+      <div id="hud-head">
+        <button id="btn-collapse" type="button" title="收起 / 展开面板">✕</button>
+        <button id="btn-info" type="button" title="游戏说明">i</button>
+      </div>
       <div id="hud-body">
         <button id="btn-mode" type="button">对战</button>
-        <div id="freq-group">
-          <span>细分</span>
-          <button type="button" data-freq="5" class="freq-btn active">5</button>
-          <button type="button" data-freq="6" class="freq-btn">6</button>
-        </div>
+        <button id="btn-freq" type="button">细分五</button>
         <button id="btn-new" type="button">新对局</button>
         <button id="btn-undo" type="button">悔棋</button>
         <button id="btn-export" type="button">导出棋局</button>
@@ -37,13 +36,21 @@
     <div id="win-overlay" hidden>
       <span id="win-text"></span>
     </div>
+
+    <!-- 游戏说明：全屏展示 info.txt（默认隐藏，点 X 退出） -->
+    <div id="info-modal" hidden>
+      <div id="info-panel">
+        <button id="btn-info-close" type="button" title="关闭说明">✕</button>
+        <pre id="info-text"></pre>
+      </div>
+    </div>
   </div>
 
   <script type="importmap">
   {
     "imports": {
-      "three": "./js/vendor/three.module.js",
-      "three/addons/controls/OrbitControls.js": "./js/vendor/OrbitControls.js"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+      "three/addons/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/controls/OrbitControls.js"
     }
   }
   </script>

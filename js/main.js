@@ -30,7 +30,7 @@ class Game {
     this.winOverlay = document.getElementById('win-overlay');
     this.winText = document.getElementById('win-text');
     this.btnMode = document.getElementById('btn-mode');
-    this.freqBtns = Array.from(document.querySelectorAll('.freq-btn'));
+    this.btnFreq = document.getElementById('btn-freq');
 
     this.rebuild(this.currentN);
 
@@ -39,33 +39,30 @@ class Game {
     document.getElementById('btn-undo').addEventListener('click', () => this.undo());
     document.getElementById('btn-export').addEventListener('click', () => this.exportGame());
 
-    // 模式切换（占位）：v1 无 AI，点击提示后仍按对战进行
+    // 模式切换（占位）：v1 无 AI，点击后提示"AI 开发中"并回退对战
     this.btnMode.addEventListener('click', () => {
-      if (this.mode === 'pvp') {
-        this.mode = 'ai';
-        this.btnMode.textContent = '人机';
-        this.statusMessage.textContent = '人机 AI 开发中，暂按对战进行';
-        // 短暂提示后回退对战模式（占位期间不接受 AI 模式）
+      this.mode = this.mode === 'pvp' ? 'ai' : 'pvp';
+      const ai = this.mode === 'ai';
+      this.btnMode.textContent = ai ? '人机' : '对战';
+      this.statusMessage.textContent = ai ? 'AI 开发中' : '';
+      // 人机为 UI 占位：短暂展示后自动回退对战
+      if (ai) {
         setTimeout(() => {
           this.mode = 'pvp';
           this.btnMode.textContent = '对战';
-        }, 1500);
+          this.statusMessage.textContent = '';
+        }, 1200);
       }
     });
 
-    // 细分频率 5/6 切换（重建棋盘会清空对局，需二次确认）
-    for (const btn of this.freqBtns) {
-      btn.addEventListener('click', () => {
-        const n = parseInt(btn.dataset.freq, 10);
-        if (n === this.currentN) return;
-        if (!confirm(`细分频率改为 ${n} 将重建棋盘并清空当前对局，确定吗？`)) return;
-        this.currentN = n;
-        this.rebuild(n);
-        for (const b of this.freqBtns) {
-          b.classList.toggle('active', b === btn);
-        }
-      });
-    }
+    // 细分频率切换（5 ↔ 6，按钮即状态）：重建棋盘会清空对局，需二次确认
+    this.btnFreq.addEventListener('click', () => {
+      const target = this.currentN === 5 ? 6 : 5;
+      if (!confirm(`细分频率改为 ${target} 将重建棋盘并清空当前对局，确定吗？`)) return;
+      this.currentN = target;
+      this.rebuild(target);
+      this.btnFreq.textContent = target === 5 ? '细分五' : '细分六';
+    });
 
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -202,6 +199,24 @@ window.addEventListener('DOMContentLoaded', () => {
   btnCollapse.addEventListener('click', () => {
     const collapsed = hud.classList.toggle('collapsed');
     btnCollapse.textContent = collapsed ? '☰' : '✕';
+  });
+
+  // 游戏说明：圆 i 打开全屏 info 弹层（内容取自 info.txt），点 X 退出
+  const infoModal = document.getElementById('info-modal');
+  const infoText = document.getElementById('info-text');
+  document.getElementById('btn-info').addEventListener('click', async () => {
+    try {
+      const res = await fetch('info.txt');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      infoText.textContent = await res.text();
+    } catch (err) {
+      infoText.textContent = '说明文字加载失败（缺少 info.txt）';
+      console.error('加载 info.txt 失败', err);
+    }
+    infoModal.hidden = false;
+  });
+  document.getElementById('btn-info-close').addEventListener('click', () => {
+    infoModal.hidden = true;
   });
 });
 
