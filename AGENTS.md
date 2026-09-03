@@ -54,8 +54,8 @@
 ```
 spherical-gomoku/
 ├── index.html          # 入口，DOM 骨架
+├── icon.png            # 页面 favicon（64×64 PNG）
 ├── info.txt            # 游戏说明正文（圆 i 弹层展示内容）
-├── info.svg            # 游戏说明备选图（Inkscape 制作；当前弹层用 info.txt 文字 + 子集字体渲染，未启用）
 ├── css/
 │   └── style.css       # UI 样式
 ├── fonts/
@@ -83,6 +83,8 @@ spherical-gomoku/
 ```
 
 **依赖引入**：ES Module + `importmap`，`three` 与 `OrbitControls` 经 **jsdelivr CDN** 引入（版本锁定 `three@0.185.0`，见 `index.html`）。本地 `js/vendor/` 已从版本库移除并加入 `.gitignore`（不再追踪）。**禁止引入 Node 专属 API、打包器或 npm 依赖**——本项目必须在纯静态环境下运行（需联网加载 CDN）。
+
+**本地素材**：`svg/` 目录存放 Inkscape 编辑源（`icon.svg`/`info.svg` 等），**仅本地保留、不随仓库追踪**（见 `.gitignore`）。页面实际使用 `icon.png`（favicon）与 `fonts/` 子集字体，均入库。
 
 **字体**：游戏文字使用**子集化字体** `GenWanMin2TC-R-subset.woff2`（@font-face 首选项，回退宋体栈）。该子集由 GenWanMin2TC-R（明体源字体，约 22MB，**已从仓库移除**）用 fontTools `pyftsubset` 按"源码 + info.txt 全部用字"切出（约 219KB/689 字形）；如 UI 文案新增字而子集缺失，需自行获取源字体后重切（`python -m pip install --break-system-packages fonttools brotli`，再 `python -m fontTools.subset <源OTF> --text-file=<用字清单> --output-file=fonts/GenWanMin2TC-R-subset.woff2 --flavor=woff2`）。
 
