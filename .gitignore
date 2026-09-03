@@ -1,0 +1,21 @@
+# 测试运行器临时文件（node tests/run.mjs 崩溃时可能残留）
+tests/.tmp-run-*.mjs
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+
+# 编辑器 / IDE
+.vscode/
+.idea/
+*.swp
+
+# 日志
+*.log
+
+# Python 诊断脚本残留（如曾出现过的 diag*.py）
+__pycache__/
+*.pyc
+
+# Node（项目禁止 npm 依赖，此处仅为防手滑）
+node_modules/
