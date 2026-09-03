@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const files = ['mesh.test.html', 'rules.test.html'];
+const files = ['mesh.test.html', 'rules.test.html', 'ai.test.html'];
 let allOk = true;
 
 for (const f of files) {

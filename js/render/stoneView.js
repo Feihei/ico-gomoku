@@ -76,6 +76,17 @@ export class StoneView {
     // 当前每颗子的顶点归属（rebuild 时记录）
     this.blackVerts = [];
     this.whiteVerts = [];
+
+    // AI 落子提示标记：四棱锥（锥尖朝棋子、底朝外，色与 AI 棋子相反——
+    // AI 执黑落墨子则显纸白锥，AI 执白落纸子则显墨黑锥，避免与棋子同色叠没）
+    this.aiMarkGeo = new THREE.ConeGeometry(CONFIG.AI_MARK_RADIUS, CONFIG.AI_MARK_HEIGHT, 4);
+    this.aiMarkInkMat = this.makeInkMat();
+    this.aiMarkPaperMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(CONFIG.COLOR_PAPER),
+    });
+    this.aiMark = new THREE.Mesh(this.aiMarkGeo, this.aiMarkInkMat);
+    this.aiMark.visible = false;
+    this.group.add(this.aiMark);
   }
 
   // 扁球几何：球体沿 +Z 压扁 STONE_SQUASH（高度为半径方向的一半）
@@ -178,6 +189,28 @@ export class StoneView {
       this.mesh.positions[v * 3 + 2]
     );
     return p.normalize().multiplyScalar(1.0 + 0.002);
+  }
+
+  // AI 落子提示：在 vertexIndex 棋子上方显示四棱锥（锥尖朝棋子、底朝外，
+  // 色与 AI 棋子相反：aiPlayer=黑 → 纸白锥，aiPlayer=白 → 墨黑锥）
+  showAiMark(vertexIndex, aiPlayer) {
+    if (vertexIndex === null || vertexIndex === undefined) return;
+    const p = this.meshPos(vertexIndex);
+    const normal = p.clone().normalize();
+    // ConeGeometry 尖端默认沿 +Y：倒置 —— 让 +Y（尖端）指向球心（-normal），
+    // 平底朝外贴棋子外侧，形成"伏在棋子上"的矮锥；中心沿法向抬半高，
+    // 使平底刚浮于棋子顶面之上（尖部没入棋子上半，渲染被遮挡无碍）
+    const quat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0), normal.clone().negate()
+    );
+    this.aiMark.position.copy(p).addScaledVector(normal, CONFIG.AI_MARK_HEIGHT * 0.5);
+    this.aiMark.quaternion.copy(quat);
+    this.aiMark.material = aiPlayer === BLACK ? this.aiMarkPaperMat : this.aiMarkInkMat;
+    this.aiMark.visible = true;
+  }
+
+  hideAiMark() {
+    this.aiMark.visible = false;
   }
 
   // 标记胜线（细墨管，压在棋子底下，与印刷风一致）

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>AI 决策测试</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #0a0e1a; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    pre { background: #141a2e; padding: 16px; border-radius: 6px; white-space: pre-wrap; }
+    .pass { color: #6fd66f; } .fail { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <h1>AI 决策测试（合法落子 / 防守威胁 / 主动成五 / 纯函数性）</h1>
+  <pre id="output"></pre>
+  <script type="module">
+    import { generateIcosphere } from '../js/mesh/icosphere.js';
+    import { validateMesh } from '../js/mesh/validate.js';
+    import { Board } from '../js/game/board.js';
+    import { checkWin, BLACK, WHITE } from '../js/game/rules.js';
+    import { chooseMove } from '../js/game/ai.js';
+    import { CONFIG } from '../js/config.js';
+
+    // 无头运行（tests/run.mjs）下无 document，退化为空壳
+    const out = typeof document !== 'undefined' ? document.getElementById('output') : { innerHTML: '' };
+    let pass = 0, fail = 0;
+    const results = [];
+
+    function assert(cond, msg) {
+      if (cond) { pass++; results.push('✓ ' + msg); }
+      else { fail++; results.push('✗ ' + msg); }
+    }
+
+    // ── 辅助：角度/轴向/直行路径（与 rules.test.html 同口径，独立构造局面） ──
+    const mesh = generateIcosphere(5);
+    validateMesh(mesh, 5);
+    const P = mesh.positions;
+
+    function angleAt(v, a, b) {
+      const n = (x, y) => {
+        const dx = P[y * 3] - P[x * 3], dy = P[y * 3 + 1] - P[x * 3 + 1], dz = P[y * 3 + 2] - P[x * 3 + 2];
+        const l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+        return [dx / l, dy / l, dz / l];
+      };
+      const va = n(v, a), vb = n(v, b);
+      return Math.acos(Math.max(-1, Math.min(1, va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2])));
+    }
+
+    function findAxis(v) {
+      const nbs = mesh.adjacency[v];
+      let best = null, ba = -1;
+      for (let i = 0; i < nbs.length; i++)
+        for (let j = i + 1; j < nbs.length; j++) {
+          const a = angleAt(v, nbs[i], nbs[j]);
+          if (a > ba) { ba = a; best = { a: nbs[i], b: nbs[j] }; }
+        }
+      return best;
+    }
+
+    // 沿最直方向从 start 出发走 steps 步（不检查占用，仅取几何路径）
+    function walkStraight(start, cameFrom, steps) {
+      const path = [start];
+      let cur = start, prev = cameFrom;
+      for (let i = 0; i < steps; i++) {
+        let best = null, ba = -1;
+        for (const d of mesh.adjacency[cur]) {
+          if (d === prev) continue;
+          const a = angleAt(cur, prev, d);
+          if (a > ba) { ba = a; best = d; }
+        }
+        if (best === null) break;
+        path.push(best);
+        prev = cur;
+        cur = best;
+      }
+      return path;
+    }
+
+    // 直铺同色子（绕过交替落子）
+    function paint(board, verts, player) {
+      for (const v of verts) board.occupied[v] = player;
+    }
+
+    // ── 测试 1：空盘首手合法且不改状态 ──
+    {
+      const board = new Board(mesh);
+      const snap = [...board.occupied];
+      const v = chooseMove(board, WHITE);
+      assert(v >= 0 && v < board.V && board.isEmpty(v), `空盘首手 ${v} 为合法空点`);
+      assert(JSON.stringify(snap) === JSON.stringify(board.occupied), 'chooseMove 不修改盘面状态');
+    }
+
+    // ── 测试 2：非空局面返回合法空点 ──
+    {
+      const board = new Board(mesh);
+      board.place(0); board.place(1); board.place(2); // 少量开局子
+      const v = chooseMove(board, WHITE);
+      assert(v >= 0 && board.isEmpty(v), `有子局面 AI 选点 ${v} 为空`);
+    }
+
+    // ── 测试 3：防守——对手(黑)下一步即成五点，AI(白)必须堵 ──
+    {
+      const board = new Board(mesh);
+      // 六价点 m 的直轴 (a,b)：黑在 a 侧 3 连，b 空且 b 沿直线远端 b1 空。
+      // 构造黑 4 连 [a2,a1,m,b]，b1 是 b 的直线延伸（空）——黑落 b1 即成五。
+      const m = 1;
+      const { a, b } = findAxis(m);
+      const aSide = walkStraight(a, m, 2); // [a, a1, a2]，从 a 往远走
+      const b1 = walkStraight(b, m, 1)[1]; // b 的直线远端（空）
+      // 黑 4 连：占 [a1, a, m, b]（m 居中，b1 留空成唯一成五点）
+      const blacks4 = [aSide[1], a, m, b];
+      paint(board, blacks4, BLACK);
+      // 确认 b1 空且黑落 b1 即成五
+      assert(board.isEmpty(b1), '构造：b1 为空');
+      board.occupied[b1] = BLACK; // 模拟黑走 b1
+      assert(checkWin(board, b1, BLACK).win, '构造：黑落 b1 应成五');
+      board.occupied[b1] = null;  // 还原
+      // AI 白应选择 b1（唯一堵点）
+      const v = chooseMove(board, WHITE);
+      assert(v === b1, `AI 应堵对手必胜点 b1（实际选 ${v}）`);
+    }
+
+    // ── 测试 4：进攻——白已有活四（双端开放），AI 白应落任一端成五 ──
+    {
+      const board = new Board(mesh);
+      const m = 1;
+      const { a, b } = findAxis(m);
+      const a2 = walkStraight(a, m, 1)[1]; // a 的远端
+      const b2 = walkStraight(b, m, 1)[1]; // b 的远端
+      // 白 4 连 [a2, a, m, b]，两端 b2 与 a2 更远处均为空 → 活四
+      paint(board, [a2, a, m, b], WHITE);
+      // 落子在 a2 更远或 b2 都成五；AI 应返回其中一个
+      const v = chooseMove(board, WHITE);
+      assert(v === b2 || v === a2, `活四局面 AI 应落端成五（实际选 ${v}）`);
+      board.occupied[v] = WHITE;
+      assert(checkWin(board, v, WHITE).win, 'AI 落子后白方成五');
+    }
+
+    // ── 测试 5：AI 先手空盘时首子也能正常下（对称验证 BLACK） ──
+    {
+      const board = new Board(mesh);
+      const v = chooseMove(board, BLACK);
+      assert(board.isEmpty(v), `黑 AI 空盘首手 ${v} 合法`);
+    }
+
+    out.innerHTML = results.map((r) => `<span class="${r[0] === '✓' ? 'pass' : 'fail'}">${r}</span>`).join('<br>') +
+      `<br><br>通过 ${pass}，失败 ${fail}`;
+    console.log(results.join('\n'));
+    console.log(`通过 ${pass}，失败 ${fail}`);
+
+    if (typeof process !== 'undefined' && process.exit) process.exit(fail > 0 ? 1 : 0);
+  </script>
+</body>
+</html>
