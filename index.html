@@ -9,30 +9,34 @@
 <body>
   <div id="app">
     <div id="canvas-container"></div>
+    <!-- 最上层纸纹噪波覆盖层（全视口统一颗粒，兼盖 WebGL 与 UI） -->
+    <div id="paper-noise"></div>
 
-    <!-- 左上角可折叠信息/控制面板（默认展开；收起后棋盘区域全幅可见） -->
+    <!-- 左侧竖向工具 bar（✕ 置最左上角收起，其余区域全幅展示棋盘） -->
     <aside id="hud">
-      <button id="btn-collapse" type="button" title="收起 / 展开面板">X</button>
-      <div class="hud-status">
-        <span class="status-item">手数：<b id="status-turn">0</b></span>
-        <span class="status-item">执子方：<b id="status-player">黑方</b></span>
-        <span class="status-item">模式：<b id="status-mode">PvP</b></span>
-        <span class="status-message" id="status-message">对局开始，黑先</span>
-      </div>
-      <div class="hud-controls">
+      <button id="btn-collapse" type="button" title="收起 / 展开面板">✕</button>
+      <div id="hud-body">
+        <button id="btn-mode" type="button">对战</button>
+        <div id="freq-group">
+          <span>细分</span>
+          <button type="button" data-freq="5" class="freq-btn active">5</button>
+          <button type="button" data-freq="6" class="freq-btn">6</button>
+        </div>
         <button id="btn-new" type="button">新对局</button>
         <button id="btn-undo" type="button">悔棋</button>
-        <label>细分频率：
-          <select id="sel-freq">
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5" selected>5</option>
-            <option value="6">6</option>
-          </select>
-        </label>
+        <button id="btn-export" type="button">导出棋局</button>
+        <div id="hud-info">
+          <div>手数：<b id="status-turn">0</b></div>
+          <div>执子方：<b id="status-player">黑方</b></div>
+          <div id="status-message"></div>
+        </div>
       </div>
     </aside>
+
+    <!-- 中央大字胜负提示（默认隐藏） -->
+    <div id="win-overlay" hidden>
+      <span id="win-text"></span>
+    </div>
   </div>
 
   <script type="importmap">

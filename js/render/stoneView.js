@@ -71,10 +71,8 @@ export class StoneView {
     this.hoverWhite.visible = false;
     this.group.add(this.hoverWhite);
 
-    // 胜线高亮（粗墨管，高于棋子顶部）
+    // 胜线高亮（细墨管，压在棋子底下）
     this.winLineMesh = null;
-    // 胜利压暗：胜线顶点集合，null 表示未压暗
-    this.winSet = null;
     // 当前每颗子的顶点归属（rebuild 时记录）
     this.blackVerts = [];
     this.whiteVerts = [];
@@ -123,9 +121,6 @@ export class StoneView {
         // 压扁轴 +Z 对齐球面法向
         quat.setFromUnitVectors(UP, normal);
         dummy.quaternion.copy(quat);
-        // 压暗状态下非胜线子缩小，视觉上弱于胜线子
-        const dimmed = this.winSet && !this.winSet.has(v);
-        dummy.scale.setScalar(dimmed ? 0.7 : 1);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
       }
@@ -174,34 +169,28 @@ export class StoneView {
     return p.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET);
   }
 
-  // 胜线所在半径：略高于压扁棋子顶面，避免管子被棋子遮住
+  // 胜线所在半径：贴近纸面（略高于网格线层 1.0），压在棋子底下——线穿过棋子的下半部，
+  // 视觉上"从棋子之间钻过"，不再悬在棋子顶面上方
   winLinePos(v) {
-    const topRadius = (CONFIG.STONE_RADIUS + CONFIG.STONE_OUTLINE) * CONFIG.STONE_SQUASH;
     const p = new THREE.Vector3(
       this.mesh.positions[v * 3],
       this.mesh.positions[v * 3 + 1],
       this.mesh.positions[v * 3 + 2]
     );
-    return p.normalize().multiplyScalar(1 + CONFIG.STONE_Z_OFFSET + topRadius + 0.006);
+    return p.normalize().multiplyScalar(1.0 + 0.002);
   }
 
-  // 标记胜线（粗墨管高亮，与印刷风一致）
+  // 标记胜线（细墨管，压在棋子底下，与印刷风一致）
   highlightWin(line) {
     this.clearWin();
     if (!line || line.length < 2) return;
 
     const points = line.map((v) => this.winLinePos(v));
     const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(8, line.length * 8), 0.014, 10, false);
+    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(8, line.length * 8), 0.008, 10, false);
     const tubeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(CONFIG.COLOR_WIN) });
     this.winLineMesh = new THREE.Mesh(tubeGeo, tubeMat);
     this.group.add(this.winLineMesh);
-  }
-
-  // 其余棋子压暗（胜利时调用）：非胜线子缩小
-  dimOthers(winLine) {
-    this.winSet = new Set(winLine || []);
-    this.applyMatrices();
   }
 
   clearWin() {
@@ -210,10 +199,6 @@ export class StoneView {
       this.winLineMesh.geometry.dispose();
       this.winLineMesh.material.dispose();
       this.winLineMesh = null;
-    }
-    if (this.winSet !== null) {
-      this.winSet = null;
-      this.applyMatrices();
     }
   }
 }

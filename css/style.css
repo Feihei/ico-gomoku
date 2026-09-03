@@ -19,94 +19,130 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
 }
 
-/* ── 左上角可折叠信息/控制面板 ── */
+/* 最上层纸纹噪波覆盖层：全视口统一颗粒（纯色物体 + 颗粒层 = 纸面质感），不拦截指针 */
+#paper-noise {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+
+/* ── 左侧竖向工具 bar ── */
 #hud {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 0;
+  left: 0;
   z-index: 10;
-  min-width: 320px;
-  background: rgba(244, 236, 217, 0.95);  /* 纸面，略透明透出墨点痕迹 */
-  border: 1.5px solid #241f18;
-  box-shadow: 2px 2px 0 rgba(36, 31, 24, 0.18);
+  display: flex;
+  flex-direction: column;
+  background: rgba(244, 236, 217, 0.97);  /* 纸面 */
+  border-right: 1.5px solid #241f18;
+  box-shadow: 2px 0 0 rgba(36, 31, 24, 0.15);
 }
 
-/* 折叠态：只剩一个小按钮，棋盘区域全幅可见 */
-#hud.collapsed {
-  min-width: 0;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-#hud.collapsed .hud-status,
-#hud.collapsed .hud-controls { display: none; }
+/* 折叠态：只留最左上角 X 按钮，棋盘全幅展示 */
+#hud.collapsed #hud-body { display: none; }
 
-/* 折叠/展开按钮（默认在面板右上角；折叠后悬于左上角） */
+/* 收起按钮：✕ 置最左上 */
 #btn-collapse {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  padding: 2px 8px;
-  font-size: 13px;
-}
-#hud.collapsed #btn-collapse {
-  position: static;
-  padding: 4px 10px;
+  align-self: flex-start;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   font-size: 15px;
+  line-height: 1;
 }
 
-/* 状态行 */
-.hud-status {
+/* bar 主体：竖向按钮组 + 底部信息 */
+#hud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  min-width: 132px;
+}
+
+#hud-body > button {
+  font-size: 14px;
+  padding: 7px 10px;
+  text-align: left;
+}
+
+/* 细分频率组（5/6 两档切换） */
+#freq-group {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  padding: 10px 84px 8px 14px;  /* 右侧给折叠按钮让位 */
-  border-bottom: 1px dashed #241f18;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 13px;
+  padding: 2px 0;
+}
+#freq-group .freq-btn {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 13px;
+  text-align: center;
+}
+/* 选中档：墨色填充反白（印刷强调） */
+#freq-group .freq-btn.active {
+  background: #241f18;
+  color: #f4ecd9;
+}
+
+/* 底部信息区 */
+#hud-info {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px dashed #241f18;
+  font-size: 13px;
+  line-height: 1.9;
   letter-spacing: 0.03em;
 }
 /* 强调数值：加粗墨字 + 下划线，模拟印刷强调 */
-.hud-status b {
-  color: #241f18;
+#hud-info b {
   font-weight: 700;
   border-bottom: 1.5px solid #241f18;
   padding: 0 2px;
 }
-.status-message {
-  margin-left: auto;
-  color: #241f18;
+#status-message {
   font-weight: 600;
 }
 
-/* 控制行 */
-.hud-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 8px 14px 10px;
-  font-size: 13px;
-}
-
+/* 按钮/控件通用（纸白底 + 墨描边） */
 button {
   font-family: inherit;
-  background: #fffdf5;           /* 纸白按钮 */
+  background: #fffdf5;
   color: #241f18;
   border: 1.5px solid #241f18;
-  padding: 4px 12px;
   cursor: pointer;
   transition: none;
 }
 /* 悬停反色：如印章按下，墨色填满 */
 button:hover { background: #241f18; color: #f4ecd9; }
+button:disabled { opacity: 0.4; cursor: default; }
+button:disabled:hover { background: #fffdf5; color: #241f18; }
 
-label { display: flex; align-items: center; gap: 5px; color: #241f18; }
+/* ── 中央大字胜负提示（印刷风大字） ── */
+#win-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;          /* 不挡棋盘操作，点新对局/悔棋即可消除 */
+  background: rgba(244, 236, 217, 0.25);
+}
+#win-overlay[hidden] { display: none; }
 
-select {
-  font-family: inherit;
-  background: #fffdf5;
+#win-text {
+  font-size: 84px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;            /* 抵消字间距实现视觉居中 */
   color: #241f18;
-  border: 1.5px solid #241f18;
-  padding: 3px 6px;
+  padding: 10px 40px;
+  border: 3px double #241f18;    /* 双线框：书面印章式的庄重感 */
+  background: rgba(244, 236, 217, 0.92);
+  box-shadow: 4px 4px 0 rgba(36, 31, 24, 0.25);
 }
