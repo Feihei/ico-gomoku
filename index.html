@@ -12,15 +12,28 @@
   <div id="loading-overlay">
     <span>加载中</span>
   </div>
-  <!-- 兜底：模块（three.js CDN）加载失败时 main.js 不会执行、加载层会一直停留；
-       此内联脚本超时后若加载层仍未隐藏，则替换为失败提示（不依赖任何模块） -->
+  <!-- 兜底：模块（three.js CDN）加载失败时 main.js 不会执行、加载层会一直停留。
+       注意：不能用固定短超时当失败信号——首次访问冷下载 CDN 常超过 8s，会误报失败。
+       正确做法：监听模块脚本加载 error 事件（真失败立即提示）+ 30s 长超时仅作最后保险 -->
   <script>
-    setTimeout(() => {
-      const el = document.getElementById('loading-overlay');
-      if (el && el.style.display !== 'none') {
-        el.textContent = '加载失败，请刷新';
+    (function () {
+      const overlay = document.getElementById('loading-overlay');
+      let failed = false;
+      function showFail() {
+        if (failed) return;
+        failed = true;
+        overlay.textContent = '加载失败，请刷新';
       }
-    }, 8000);
+      // 任一脚本/模块（含 three.js）资源加载失败 → 立即提示；运行时异常不在此列
+      window.addEventListener('error', (e) => {
+        const t = e && e.target;
+        if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK' || t.tagName === 'IMG')) showFail();
+      }, true);
+      // 最后保险：30 秒仍未就绪才提示失败（覆盖"卡住但不报错"的极端情况）
+      setTimeout(() => {
+        if (overlay && overlay.style.display !== 'none' && !failed) showFail();
+      }, 30000);
+    })();
   </script>
   <div id="app">
     <div id="canvas-container"></div>
