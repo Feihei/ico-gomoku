@@ -136,6 +136,25 @@ body {
   font-weight: 600;
 }
 
+/* ── 首屏加载提示（three.js CDN 首次下载较慢，初始化完成即隐藏） ── */
+#loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;             /* 高于 hud(10) 与 win-overlay(500)，低于 info-modal(3000) 与噪波层(9999) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 236, 217, 0.9);
+}
+#loading-overlay span {
+  font-size: 28px;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;       /* 抵消字间距实现视觉居中 */
+  color: #241f18;
+  border-bottom: 2px dashed #241f18;
+  padding-bottom: 6px;
+}
+
 /* ── 游戏说明全屏弹层（展示 info.txt，印刷风） ── */
 #info-modal {
   position: fixed;

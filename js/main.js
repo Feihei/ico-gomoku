@@ -327,7 +327,20 @@ window.addEventListener('DOMContentLoaded', () => {
   // 最上层纸纹噪波覆盖层：生成灰度细颗粒图块铺满视口（物体纯平涂色 + 颗粒层 = 纸面）
   paintNoiseOverlay();
 
-  new Game();
+  try {
+    new Game();
+  } catch (err) {
+    // 初始化失败（如 WebGL 不可用）：显示加载失败而非停在"加载中"
+    // 文案用字需在子集字体内（加/载/失/败/请/刷/新 均收录）
+    const loading = document.getElementById('loading-overlay');
+    if (loading) loading.textContent = '加载失败，请刷新';
+    console.error('游戏初始化失败', err);
+    return;
+  }
+
+  // 初始化完成：隐藏首屏加载提示
+  const loading = document.getElementById('loading-overlay');
+  if (loading) loading.style.display = 'none';
 
   // 左侧竖向 bar 收起/展开（✕ 置最左上，收起后 ☰ 恢复）
   const hud = document.getElementById('hud');
