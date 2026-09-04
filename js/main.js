@@ -22,8 +22,10 @@ class Game {
     this.stoneView = new StoneView(this.scene);
     this.raycaster = null;
     this.currentN = CONFIG.SUBDIVISION_FREQ;
-    // 模式与执色：pvp=对战；ai=人机（玩家执 humanColor，AI 执另一色）
-    this.mode = 'pvp';
+    // 模式与执色：pvp=双人；ai=人机（玩家执 humanColor，AI 执另一色）
+    // 默认人机对战；按钮文案为"命令式"：显示"点击后切换到的目标"而非当前状态
+    // （人机 → "双人"，双人 → "人机"；玩家执黑 → "执白"，执白 → "执黑"）
+    this.mode = 'ai';
     this.humanColor = BLACK; // 玩家默认执黑先行
     this.aiTimer = null;     // AI 落子定时器（思考延迟）
 
@@ -43,11 +45,11 @@ class Game {
     document.getElementById('btn-undo').addEventListener('click', () => this.undo());
     document.getElementById('btn-export').addEventListener('click', () => this.exportGame());
 
-    // 模式切换：对战 ↔ 人机（真实生效；切换时清盘重开）
+    // 模式切换（命令式文案）：人机 ↔ 双人，切换时清盘重开
     this.btnMode.addEventListener('click', () => {
       const ai = this.mode !== 'ai';
       this.mode = ai ? 'ai' : 'pvp';
-      this.btnMode.textContent = ai ? '人机' : '对战';
+      this.btnMode.textContent = ai ? '双人' : '人机'; // 显示点击后的目标模式
       this.btnColor.hidden = !ai;
       this.statusMessage.textContent = ai
         ? `人机模式：你执${this.humanColor === BLACK ? '黑' : '白'}（可点按钮换边）`
@@ -55,10 +57,10 @@ class Game {
       this.startNewRound();
     });
 
-    // 人机模式换边：玩家执黑 ↔ 执白（执白时 AI 执黑先行）
+    // 人机模式换边（命令式文案）：玩家执黑 ↔ 执白（执白时 AI 执黑先行）
     this.btnColor.addEventListener('click', () => {
       this.humanColor = this.humanColor === BLACK ? WHITE : BLACK;
-      this.btnColor.textContent = this.humanColor === BLACK ? '执黑' : '执白';
+      this.btnColor.textContent = this.humanColor === BLACK ? '执白' : '执黑'; // 显示点击后的目标执色
       this.statusMessage.textContent = `你执${this.humanColor === BLACK ? '黑' : '白'}，本局${this.humanColor === BLACK ? '你先手' : 'AI 先手'}`;
       this.startNewRound();
     });
@@ -192,11 +194,14 @@ class Game {
   // 结算一局：胜负 / 和棋（更新状态行提示后落中央大字）
   finishRound(res) {
     if (res.won) {
-      const humanWon = this.mode === 'ai' ? res.player === this.humanColor : null;
       this.stoneView.highlightWin(res.line);
       this.statusMessage.textContent = '';
-      const suffix = humanWon === null ? '' : (humanWon ? '（你赢了）' : '（AI 赢了）');
-      this.showResult((res.player === BLACK ? '黑胜' : '白胜') + suffix);
+      if (this.mode === 'ai') {
+        // 人机模式：以玩家视角出结果（命令式文案）
+        this.showResult(res.player === this.humanColor ? '你赢了' : '你输了');
+      } else {
+        this.showResult(res.player === BLACK ? '黑胜' : '白胜');
+      }
     } else if (res.isDraw) {
       this.statusMessage.textContent = '';
       this.showResult('和棋');

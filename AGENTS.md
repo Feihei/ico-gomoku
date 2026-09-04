@@ -59,7 +59,8 @@ spherical-gomoku/
 ├── css/
 │   └── style.css       # UI 样式
 ├── fonts/
-│   └── GenWanMin2TC-R-subset.woff2  # 子集化字体（收集源码与 info.txt 全部用字，约 219KB）
+│   ├── GenWanMin2TC-R.otf            # 字体源文件（22MB，**仅本地**，`.gitignore` 忽略，供重新子集化）
+│   └── GenWanMin2TC-R-subset.woff2   # 子集化字体（收集源码与 info.txt 全部用字，约 233KB，入库）
 ├── js/
 │   ├── main.js         # 入口：初始化渲染循环、装配各模块
 │   ├── config.js       # 所有可调常量（细分频率、胜利连珠数、颜色、相机参数）
@@ -88,7 +89,7 @@ spherical-gomoku/
 
 **本地素材**：`svg/` 目录存放 Inkscape 编辑源（`icon.svg`/`info.svg` 等），**仅本地保留、不随仓库追踪**（见 `.gitignore`）。页面实际使用 `icon.png`（favicon）与 `fonts/` 子集字体，均入库。
 
-**字体**：游戏文字使用**子集化字体** `GenWanMin2TC-R-subset.woff2`（@font-face 首选项，回退宋体栈）。该子集由 GenWanMin2TC-R（明体源字体，约 22MB，**已从仓库移除**）用 fontTools `pyftsubset` 按"源码 + info.txt 全部用字"切出（约 219KB/689 字形）；如 UI 文案新增字而子集缺失，需自行获取源字体后重切（`python -m pip install --break-system-packages fonttools brotli`，再 `python -m fontTools.subset <源OTF> --text-file=<用字清单> --output-file=fonts/GenWanMin2TC-R-subset.woff2 --flavor=woff2`）。
+**字体**：游戏文字使用**子集化字体** `GenWanMin2TC-R-subset.woff2`（@font-face 首选项，回退宋体栈）。该子集由 `fonts/GenWanMin2TC-R.otf`（明体源字体，约 22MB，**仅本地保留、`.gitignore` 忽略**，不入库）用 fontTools `pyftsubset` 按"源码 + info.txt 全部用字"切出（约 233KB/683 字形）；如 UI 文案新增字而子集缺失，用本地源字体重切（`python -m pip install --break-system-packages fonttools brotli`，先扫描源码与 info.txt 收集用字清单，再 `python -m fontTools.subset fonts/GenWanMin2TC-R.otf --text-file=<用字清单> --output-file=fonts/GenWanMin2TC-R-subset.woff2 --flavor=woff2`）。
 
 **测试约定**：不引入测试框架，使用极简自写断言（`assert(cond, msg)`），以 HTML 页面承载、控制台输出结果。测试可独立打开运行；也可用 `node tests/run.mjs` 无头运行同一套断言（Node ≥ 22 对 `.mjs` 原生按 ESM 处理，项目无 `package.json`）。
 
@@ -162,14 +163,14 @@ evaluatePlacement(board, v, player) // → 数字（player 若落 v 的威胁分
 
 - **布局**：左侧竖向工具 bar（`#hud`，**无边框**、固定宽度防消息撑宽），收起按钮 **✕ 置最左上角**（点击收起，折叠后仅剩 ☰ 可再展开）；其下方始终可见一个**圆圈 i 说明按钮**，其余区域完全展示棋盘（canvas 全幅）
 - bar 内容（竖排按钮组，信息区在下）：
-  - **模式切换**（`#btn-mode` 对战/人机）：人机为真实 AI 对战（玩家执 `humanColor`，AI 执另一色）；切换清盘重开
-  - **执色切换**（`#btn-color` 执黑/执白，仅人机模式显示）：玩家选执黑（默认，先行）或执白（AI 执黑先行）
+  - **模式切换**（`#btn-mode`）：**默认人机对战**。按钮文案为**命令式**——显示"点击后切换到的目标"而非当前状态：人机模式下显示"双人"（点击切到双人）、双人模式下显示"人机"（点击切回人机）；切换清盘重开
+  - **执色切换**（`#btn-color`，仅人机模式显示）：同为命令式文案——玩家执黑时显示"执白"（点击换到执白）、执白时显示"执黑"（点击换回执黑）；默认玩家执黑先行，执白时 AI 执黑先行
   - **细分频率切换按钮**（`#btn-freq`，文本即状态："细分五"/"细分六" 互切）；切换重建棋盘会清空对局，需二次确认
   - 新对局、悔棋、**导出棋局 JSON**（下载文件：细分频率、连珠数、全部手数、结果）
   - 信息区：手数、执子方、消息（**无"对局开始，黑先"式初始消息**，默认留空）
 - **游戏说明**：圆圈 i（`#btn-info`）点击后全屏弹层（`#info-modal`）展示 `info.txt` 正文，右上角 **X 退出**；正文用子集化字体排版
 - 获胜连珠数**固定 5**，无 UI 入口
-- **结束状态**：胜利/和棋时在**视口中央弹出大字**（`#win-overlay`："黑胜" / "白胜" / "和棋"，印刷风双线框大字），点新对局/悔棋/重建即消除
+- **结束状态**：胜利/和棋时在**视口中央弹出大字**（`#win-overlay`，印刷风双线框大字）：双人模式显示"黑胜"/"白胜"，**人机模式以玩家视角显示"你赢了"/"你输了"**（AI 胜即"你输了"），和棋均显示"和棋"；点新对局/悔棋/重建即消除
 - **风格**：全部 UI 为 HTML/CSS 覆盖层（纸底墨字印刷风，文字字体首选项为子集化 `GenWanMin2TC-R`），与 WebGL canvas 分层；**禁止在 WebGL 内绘制文字 UI**；文字、按钮一律纸面底 + 墨色文字/描边，禁止玻璃拟态与彩色强调
 
 ## 8. 编码约定
