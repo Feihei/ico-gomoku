@@ -22,16 +22,20 @@
       <div id="hud-body">
         <button id="btn-mode" type="button">双人</button>
         <button id="btn-color" type="button">执白</button>
-        <button id="btn-freq" type="button">细分五</button>
+        <button id="btn-freq" type="button">细分六</button>
         <button id="btn-new" type="button">新对局</button>
         <button id="btn-undo" type="button">悔棋</button>
         <button id="btn-export" type="button">导出棋局</button>
         <div id="hud-info">
+          <div>模式：<b id="status-mode">人机</b></div>
+          <div>棋盘：<b id="status-board">细分五</b></div>
           <div>手数：<b id="status-turn">0</b></div>
-          <div>执子方：<b id="status-player">黑方</b></div>
+          <div id="status-player-row">执子方：<b id="status-player">黑方</b></div>
           <div id="status-message"></div>
         </div>
       </div>
+      <!-- 展开态时 i 按钮的落点：位于 bar 最下方（折叠时由 JS 移回 hud-head） -->
+      <div id="hud-info-slot"></div>
     </aside>
 
     <!-- 中央大字胜负提示（默认隐藏） -->

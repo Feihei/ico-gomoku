@@ -78,6 +78,27 @@ body {
   font-style: italic;
 }
 
+/* 展开态：i 按钮由 JS 移到 bar 最下方的独立槽位（居中圆圈，与头部样式一致） */
+#hud-info-slot {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 10px;
+}
+#hud-info-slot button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  background: transparent;
+  border: 1.5px solid #241f18;
+  border-radius: 50%;
+  font-style: italic;
+}
+#hud-info-slot button:hover { background: #241f18; color: #f4ecd9; }
+/* 收起态：槽位无内容时占位隐藏（i 已移回 hud-head） */
+#hud.collapsed #hud-info-slot { display: none; }
+
 /* bar 主体：竖向按钮组 + 底部信息 */
 #hud-body {
   display: flex;

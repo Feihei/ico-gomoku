@@ -31,6 +31,9 @@ class Game {
 
     this.statusTurn = document.getElementById('status-turn');
     this.statusPlayer = document.getElementById('status-player');
+    this.statusPlayerRow = document.getElementById('status-player-row');
+    this.statusMode = document.getElementById('status-mode');
+    this.statusBoard = document.getElementById('status-board');
     this.statusMessage = document.getElementById('status-message');
     this.winOverlay = document.getElementById('win-overlay');
     this.winText = document.getElementById('win-text');
@@ -44,6 +47,7 @@ class Game {
     document.getElementById('btn-new').addEventListener('click', () => this.newGame());
     document.getElementById('btn-undo').addEventListener('click', () => this.undo());
     document.getElementById('btn-export').addEventListener('click', () => this.exportGame());
+    this.updateFreqButton(); // 命令式初始文案：默认细分五 → 按钮显示"细分六"
 
     // 模式切换（命令式文案）：人机 ↔ 双人，切换时清盘重开
     this.btnMode.addEventListener('click', () => {
@@ -65,13 +69,13 @@ class Game {
       this.startNewRound();
     });
 
-    // 细分频率切换（5 ↔ 6，按钮即状态）：重建棋盘会清空对局，需二次确认
+    // 细分频率切换（命令式文案：当前细分五显示"细分六"，反之亦然）：重建棋盘会清空对局，需二次确认
     this.btnFreq.addEventListener('click', () => {
       const target = this.currentN === 5 ? 6 : 5;
       if (!confirm(`细分频率改为 ${target} 将重建棋盘并清空当前对局，确定吗？`)) return;
       this.currentN = target;
       this.rebuild(target);
-      this.btnFreq.textContent = target === 5 ? '细分五' : '细分六';
+      this.updateFreqButton();
     });
 
     this.loop = this.loop.bind(this);
@@ -290,8 +294,20 @@ class Game {
     URL.revokeObjectURL(url);
   }
 
+  // 细分按钮命令式文案：显示"点击后切换到的目标"——当前细分五显示"细分六"，反之亦然
+  updateFreqButton() {
+    this.btnFreq.textContent = this.currentN === 5 ? '细分六' : '细分五';
+  }
+
   updateUI() {
+    // 模式行：人机模式带玩家执色"人机（你执黑/白）"，双人模式仅"双人"
+    this.statusMode.textContent = this.mode === 'ai'
+      ? `人机（你执${this.humanColor === BLACK ? '黑' : '白'}）`
+      : '双人';
+    this.statusBoard.textContent = this.currentN === 5 ? '细分五' : '细分六';
     this.statusTurn.textContent = String(this.board.history.length);
+    // 执子方行仅双人模式显示（人机模式已由模式行表达执色）
+    this.statusPlayerRow.hidden = this.mode === 'ai';
     this.statusPlayer.textContent = this.board.currentPlayer === BLACK ? '黑方' : '白方';
   }
 
@@ -316,10 +332,21 @@ window.addEventListener('DOMContentLoaded', () => {
   // 左侧竖向 bar 收起/展开（✕ 置最左上，收起后 ☰ 恢复）
   const hud = document.getElementById('hud');
   const btnCollapse = document.getElementById('btn-collapse');
+  const btnInfo = document.getElementById('btn-info');
+  const infoSlot = document.getElementById('hud-info-slot');
+
+  // i 按钮随折叠状态换位：展开时位于 bar 底部槽位，收起时回到 ✕ 下方（hud-head）
+  const placeInfoButton = () => {
+    const target = hud.classList.contains('collapsed') ? document.getElementById('hud-head') : infoSlot;
+    if (btnInfo.parentElement !== target) target.appendChild(btnInfo);
+  };
+
   btnCollapse.addEventListener('click', () => {
     const collapsed = hud.classList.toggle('collapsed');
     btnCollapse.textContent = collapsed ? '☰' : '✕';
+    placeInfoButton();
   });
+  placeInfoButton(); // 初始为展开态：i 按钮落到 bar 底部
 
   // 游戏说明：圆 i 打开全屏 info 弹层（内容取自 info.txt），点 X 退出
   const infoModal = document.getElementById('info-modal');
