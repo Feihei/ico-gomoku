@@ -300,9 +300,10 @@ class Game {
   }
 
   updateUI() {
-    // 模式行：人机模式带玩家执色"人机（你执黑/白）"，双人模式仅"双人"
+    // 模式行：人机模式带玩家执色"人机（你执黑/白）"且括号前换行，双人模式仅"双人"
+    // （换行由 CSS white-space:pre-line 呈现）
     this.statusMode.textContent = this.mode === 'ai'
-      ? `人机（你执${this.humanColor === BLACK ? '黑' : '白'}）`
+      ? `人机\n（你执${this.humanColor === BLACK ? '黑' : '白'}）`
       : '双人';
     this.statusBoard.textContent = this.currentN === 5 ? '细分五' : '细分六';
     this.statusTurn.textContent = String(this.board.history.length);

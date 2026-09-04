@@ -52,13 +52,19 @@ body {
 #hud.collapsed { width: auto; }
 #hud.collapsed #hud-body { display: none; }
 
-/* bar 头部：收起 ✕ 在上、说明 ⓘ 在下（纵向叠放，均不随折叠隐藏） */
+/* bar 头部：收起 ✕ 与游戏名同行，说明 ⓘ 在下（均不随折叠隐藏） */
 #hud-head {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   padding: 4px;
+}
+#hud-head-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
 }
 #hud-head button {
   width: 30px;
@@ -68,8 +74,23 @@ body {
   line-height: 1;
   background: transparent;
   border: none;
+  flex: none;                /* 按钮不随标题挤压 */
 }
 #hud-head button:hover { background: #241f18; color: #f4ecd9; }
+
+/* 游戏名：绝对定位固定在 ✕ 按钮右侧（bar 外），不随展开/收起变动、始终单行。
+   #hud 为 position:absolute，故以 bar 左上角为锚；✕ 在 4px 内边距 + 30px 宽，
+   标题起点 left≈40px；top 对齐 ✕ 垂直中心（4 + 30/2 − 半行高） */
+#hud-title {
+  position: absolute;
+  top: 11px;
+  left: 40px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;         /* 始终一行，不再随 bar 宽度换行 */
+  line-height: 1.2;
+}
+/* 注意：不再有 #hud.collapsed #hud-title 隐藏规则——标题固定在 bar 外常驻 */
 
 /* 说明按钮：圆圈 i */
 #btn-info {
@@ -78,11 +99,13 @@ body {
   font-style: italic;
 }
 
-/* 展开态：i 按钮由 JS 移到 bar 最下方的独立槽位（居中圆圈，与头部样式一致） */
+/* 展开态：i 按钮由 JS 移到 bar 最下方的独立槽位（左对齐，与按钮列左缘齐平） */
 #hud-info-slot {
   display: flex;
-  justify-content: center;
-  padding: 2px 0 10px;
+  justify-content: flex-start; /* 左对齐（用户需求：不要居中） */
+  align-items: center;         /* 垂直居中 */
+  width: 100%;                 /* 占满 148px bar 宽 */
+  padding: 2px 0 10px 10px;    /* 左边距与 hud-body 按钮内边距一致，视觉对齐 */
 }
 #hud-info-slot button {
   width: 30px;
@@ -134,6 +157,10 @@ body {
 }
 #status-message {
   font-weight: 600;
+}
+/* 模式行换行：人机（你执黑/白）的括号前换行（\n 由 JS 写入） */
+#status-mode {
+  white-space: pre-line;
 }
 
 /* ── 首屏加载提示（three.js CDN 首次下载较慢，初始化完成即隐藏） ── */
