@@ -260,6 +260,41 @@
       }
     }
 
+    // ── 测试 12：五价点在中间、两侧各 2 子成直线，必须判胜（棋谱回归） ──
+    // 用户实测局面（导出的棋谱）：黑 91,151,154,92,95——91 是五价点，
+    // 直线 154-151-91-92-95 穿行五价点（91 处夹角约 142.3° > 五价点阈值 114.6°），
+    // 两侧各 2 黑、非五边形相邻顶点。曾在人机模式被误报"漏判"，
+    // 根因是 AI 抢占 92 致黑子未占全（规则本身无 bug），此处锁定判胜行为防回归。
+    {
+      const board = new Board(mesh);
+      paint(board, [151, 154, 91, 92, 95], BLACK);
+      // 端点锚定：最后一手在 95
+      const rEnd = checkWin(board, 95, BLACK);
+      assert(rEnd.win, '五价点在中间(端点锚定 95)：直线 5 连应判胜');
+      assert(rEnd.line && rEnd.line.includes(91), '获胜线包含中间五价点 91');
+      // 五价点自身锚定：最后一手在 91
+      const rMid = checkWin(board, 91, BLACK);
+      assert(rMid.win, '五价点在中间(自身锚定 91)：直线 5 连应判胜');
+    }
+
+    // ── 测试 13：五价点在中间，两侧非直线（相邻拐弯）不判胜 ──
+    {
+      const board = new Board(mesh);
+      const star = mesh.degree5Vertices[0];
+      // 取星位点相邻的两个邻居（五边形相邻边，夹角约 72°），两侧各铺 2 子成折线
+      const nbs = mesh.adjacency[star];
+      const a = nbs[0], b = nbs[1]; // 五边形相邻顶点（非直线穿行）
+      const a2 = walkStraight(a, star, 1)[1] || null;
+      const b2 = walkStraight(b, star, 1)[1] || null;
+      if (a2 !== null && b2 !== null && new Set([a2, a, star, b, b2]).size === 5) {
+        paint(board, [a2, a, star, b, b2], BLACK);
+        const r = checkWin(board, star, BLACK);
+        assert(!r.win, '五价点相邻拐弯（72°）不构成直线 5 连');
+      } else {
+        assert(false, '相邻拐弯测试构造失败');
+      }
+    }
+
     out.innerHTML = results.map((r) => `<span class="${r[0] === '✓' ? 'pass' : 'fail'}">${r}</span>`).join('<br>') +
       `<br><br>通过 ${pass}，失败 ${fail}`;
     console.log(results.join('\n'));
